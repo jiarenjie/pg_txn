@@ -1,15 +1,51 @@
 {application, pg_txn,
- [{description, "An OTP library"},
-  {vsn, "0.1.0"},
-  {registered, []},
-  {applications,
-   [kernel,
-    stdlib
-   ]},
-  {env,[]},
-  {modules, []},
+  [{description, "An OTP library"},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {applications,
+      [kernel,
+        stdlib
+      ]},
+    {env,
+      [
+        {debug, false},
+        {mcht_txn_req_collect,
+          [
+            {stages,
+              [
+                {stage,
+                  {stage_handle_mcht_req,
+                    [
+                      {model_in,pg_mcht_protocol_req_collect}
+                      ,{model_repo,repo_mcht_txn_log_pt}
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {mcht_txn_req_pay,
+          [
+            {stages,
+              [
+                {stage,
+                  {stage_handle_mcht_req,
+                    [
 
-  {maintainers, []},
-  {licenses, ["Apache 2.0"]},
-  {links, []}
- ]}.
+                    ]
+                  }
+                }
+              ]
+            }
+
+          ]
+        }
+      ]
+    },
+    {modules, []},
+
+    {maintainers, []},
+    {licenses, ["Apache 2.0"]},
+    {links, []}
+  ]}.
