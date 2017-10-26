@@ -8,9 +8,13 @@
 
 -export([
   handle/2
+  , repo_module/1
 ]).
 
 -define(APP, ?MODULE).
+%%-------------------------------------------------------------------
+-define(LARGER_STACKTRACE_1(X),
+  lager:error("Error =~p,stacktrace=~s", [X, lager:pr_stacktrace(erlang:get_stacktrace())])).
 %%====================================================================
 %% API functions
 %%====================================================================
@@ -20,14 +24,32 @@
   MchtTxnLog :: pg_model:pg_model().
 
 stage_handle_mcht_req(PV, Options) when is_list(PV), is_list(Options) ->
+  %% validate wire format
+  pg_txn_stage_handler:validate_format(PV),
+
+  %% create model
   MIn = proplists:get_value(model_in, Options),
   MRepo = proplists:get_value(model_repo, Options),
+  MchtReq = pg_txn_stage_handler:create_req_model(MIn, PV),
 
-  MchtReq = pg_protocol:out_2_in(MIn, PV),
-  {ok, Repo} = pg_mcht_protocol:save(MIn, MchtReq),
-  Repo.
+  %% validate mcht req model
+  pg_txn_stage_handler:validate_biz(MIn, MchtReq),
+
+  %% save mcht req model
+  {P, Repo} = pg_txn_stage_handler:save_req_model(MIn, MchtReq),
+  {P, Repo}.
 
 
+%%-----------------------------------------------------------------
+repo_module(mchants) ->
+  {ok, Module} = application:get_env(?APP, mcht_repo_name),
+  Module;
+repo_module(mcht_txn_log) ->
+  {ok, Module} = application:get_env(?APP, mcht_txn_log_repo_name),
+  Module;
+repo_module(up_txn_log) ->
+  {ok, Module} = application:get_env(?APP, up_txn_log_repo_name),
+  Module.
 %%-----------------------------------------------------------------
 handle(M, Params) when is_atom(M) ->
   {ok, TxnConfig} = application:get_env(?APP, M),

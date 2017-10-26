@@ -8,7 +8,11 @@
       ]},
     {env,
       [
-        {debug, false},
+        {debug, false}
+        , {mcht_repo_name, repo_mchants_pt}
+        , {mcht_txn_log_repo_name, repo_mcht_txn_log_pt}
+        , {up_txn_log_repo_name, repo_up_txn_log_pt}
+        ,
         {mcht_txn_req_collect,
           [
             {stages,
@@ -16,8 +20,8 @@
                 {stage,
                   {stage_handle_mcht_req,
                     [
-                      {model_in,pg_mcht_protocol_req_collect}
-                      ,{model_repo,repo_mcht_txn_log_pt}
+                      {model_in, pg_mcht_protocol_req_collect}
+                      , {model_repo, repo_mcht_txn_log_pt}
                     ]
                   }
                 }

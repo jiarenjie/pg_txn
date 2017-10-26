@@ -19,25 +19,75 @@ setup() ->
   lager:start(),
   pg_test_utils:setup(mnesia),
   application:start(pg_mcht_enc),
+  application:start(pg_mcht_protocol),
+  application:start(pg_up_protocol),
+  application:start(pg_convert),
 
   pg_repo:drop(?M_Repo),
   pg_repo:init(?M_Repo),
 
   env_init(),
 
+  db_init(),
+
   ok.
 
+
+%%------------------------------------------------------------
+db_init() ->
+  RepoContents = [
+    {pg_txn:repo_module(mchants),
+      [
+        [
+          {id, 1}
+          , {payment_method, [gw_collect]}
+        ],
+        [
+          {id, 2}
+          , {payment_method, [gw_wap]}
+        ],
+        [
+          {id, 3}
+          , {payment_method, [gw_netbank]}
+        ],
+        [
+          {id, 4}
+          , {payment_method, [gw_netbank_only]}
+        ]
+
+      ]
+    },
+    {pg_txn:repo_module(mcht_txn_log),
+      [
+
+      ]
+    },
+    {pg_txn:repo_module(up_txn_log),
+      [
+
+      ]
+    }
+  ],
+  pg_test_utils:db_init(RepoContents),
+  ok.
+
+%%------------------------------------------------------------
 env_init() ->
   Cfgs = [
     {pg_mcht_protocol,
       [
         {debug, true},
-        {mcht_repo_name, pg_txn_t_repo_mcht_txn_log_pt}
+        {mcht_repo_name, pg_txn_t_repo_mchants_pt}
+        , {mcht_txn_log_repo_name, pg_txn_t_repo_mcht_txn_log_pt}
       ]
     },
     {pg_txn,
       [
-        {debug, true},
+        {debug, true}
+        , {mcht_repo_name, pg_txn_t_repo_mchants_pt}
+        , {mcht_txn_log_repo_name, pg_txn_t_repo_mcht_txn_log_pt}
+        , {up_txn_log_repo_name, pg_txn_t_repo_up_txn_log_pt}
+        ,
         {mcht_txn_req_collect,
           [
             {stages,
@@ -61,6 +111,8 @@ env_init() ->
 
   pg_test_utils:env_init(Cfgs).
 
+%%------------------------------------------------------------
+
 my_test_() ->
   {
     setup,
@@ -69,6 +121,7 @@ my_test_() ->
       inorder,
       [
         fun mcht_txn_req_collect_test_1/0
+        , fun mchants_test_1/0
 
       ]
     }
@@ -98,12 +151,30 @@ sig(collect) ->
   M = pg_mcht_protocol_req_collect,
   PV = qs(collect),
   Model = pg_protocol:out_2_in(M, PV),
-  {SignString, Sig} = pg_mcht_protocol:sign(M, Model),
-  {SignString, Sig}.
+  {_SignString, Sig} = pg_mcht_protocol:sign(M, Model),
+  Sig.
+
+sign_string(collect) ->
+  M = pg_mcht_protocol_req_collect,
+  PV = qs(collect),
+  Model = pg_protocol:out_2_in(M, PV),
+  {SignString, _Sig} = pg_mcht_protocol:sign(M, Model),
+  SignString.
+%%--------------------------------------------------------------------
+mchants_test_1() ->
+  MMchants = pg_txn:repo_module(mchants),
+  ?assertEqual([[gw_collect]], pg_repo:fetch_by(MMchants, 1, [payment_method])),
+  ?assertEqual([[gw_collect]], pg_repo:fetch_by(MMchants, <<"001">>, [payment_method])),
+%%  ?debugFmt("Mchants 1 = ~p", [pg_repo:read(MMchants, 1)]),
+%%  ?debugFmt("Mchants 001 = ~p", [pg_repo:read(MMchants, <<"001">>)]),
+%%  ?debugFmt("Mchants 2 = ~p", [pg_repo:read(MMchants, 2)]),
+  ok.
 %%--------------------------------------------------------------------
 mcht_txn_req_collect_test_1() ->
+%%  ?debugFmt("pg_mcht_protocol's env = ~p", [application:get_all_env(pg_mcht_protocol)]),
+
   PV = qs(collect) ++ [{<<"signature">>, sig(collect)}],
-  Result = pg_txn:handle(mcht_txn_req_collect, PV),
+  {_, Result} = pg_txn:handle(mcht_txn_req_collect, PV),
   Exp = {mcht_txn_log, {<<"00001">>, <<"20171021">>,
     <<"20171021095817473460847">>},
     collect, <<"00001">>, <<"20171021">>,
