@@ -9,8 +9,14 @@
 -export([
   handle/2
   , repo_module/1
+  , txn_options/1
+  , stage_options/2
 ]).
 
+-export([
+  txn_options_test_1/0
+  , stage_options_test_1/0
+]).
 -define(APP, ?MODULE).
 %%-------------------------------------------------------------------
 -define(LARGER_STACKTRACE_1(X),
@@ -29,7 +35,7 @@ stage_handle_mcht_req(PV, Options) when is_list(PV), is_list(Options) ->
 
   %% create model
   MIn = proplists:get_value(model_in, Options),
-  MRepo = proplists:get_value(model_repo, Options),
+  _MRepo = proplists:get_value(model_repo, Options),
   MchtReq = pg_txn_stage_handler:create_req_model(MIn, PV),
 
   %% validate mcht req model
@@ -41,15 +47,47 @@ stage_handle_mcht_req(PV, Options) when is_list(PV), is_list(Options) ->
 
 
 %%-----------------------------------------------------------------
-repo_module(mchants) ->
+repo_module(mchants = TableName) ->
   {ok, Module} = application:get_env(?APP, mcht_repo_name),
+  TableName = pg_model:name(Module),
   Module;
-repo_module(mcht_txn_log) ->
+repo_module(mcht_txn_log = TableName) ->
   {ok, Module} = application:get_env(?APP, mcht_txn_log_repo_name),
+  TableName = pg_model:name(Module),
   Module;
-repo_module(up_txn_log) ->
+repo_module(up_txn_log = TableName) ->
   {ok, Module} = application:get_env(?APP, up_txn_log_repo_name),
+  TableName = pg_model:name(Module),
   Module.
+%%-----------------------------------------------------------------
+txn_options(MTxn) when is_atom(MTxn) ->
+  {ok, TxnConfig} = application:get_env(?APP, MTxn),
+  proplists:delete(stages, TxnConfig).
+
+txn_options_test_1() ->
+  Options = txn_options(mcht_txn_req_collect),
+  ?assertEqual(body, proplists:get_value(resp_mode, Options)),
+  ok.
+
+%%-----------------------------------------------------------------
+stage_options(MTxn, Stage) ->
+  {ok, TxnConfig} = application:get_env(?APP, MTxn),
+  Stages = proplists:get_value(stages, TxnConfig),
+
+  F = fun
+        ({stage, {StageName, Options}}, {StageName,AccIn}) ->
+          {StageName,Options};
+        (_, Acc) ->
+          Acc
+      end,
+  {Stage,StageOptions} = lists:foldl(F, {Stage,undefined}, Stages),
+  StageOptions.
+
+stage_options_test_1() ->
+  ?assertEqual([{model_in, pg_mcht_protocol_req_collect}, {model_repo, pg_txn_t_repo_mcht_txn_log_pt}],
+    stage_options(mcht_txn_req_collect, stage_handle_mcht_req)),
+  ok.
+
 %%-----------------------------------------------------------------
 handle(M, Params) when is_atom(M) ->
   {ok, TxnConfig} = application:get_env(?APP, M),
@@ -57,13 +95,36 @@ handle(M, Params) when is_atom(M) ->
   xfutils:cond_lager(?MODULE, debug, error, "Stages = ~p", [Stages]),
 
   F =
-    fun({stage, {Stage, Options}}, Acc) ->
-      AccNew = ?MODULE:Stage(Acc, Options),
+    fun({stage, {Stage, StageOptions}}, LastParams) ->
+      ?debugFmt("before stage:~p , Params = ~p,Options = ~p", [Stage, LastParams, StageOptions]),
+      AccNew = ?MODULE:Stage(LastParams, StageOptions),
       AccNew
     end,
-  Result = lists:foldl(F, Params, Stages),
-  Result.
+
+  try
+    Result = lists:foldl(F, Params, Stages),
+    Result
+  catch
+    throw:{_, RespCd, RespMsg, FailResult} = X ->
+      ?debugFmt("X = ~p", [X]),
+      render_fail_result(M, TxnConfig, RespCd, RespMsg, FailResult);
+    _:X ->
+      ?debugFmt("X = ~p", [X])
+  end.
 
 %%====================================================================
 %% Internal functions
 %%====================================================================
+render_fail_result(M, TxnConfig, RespCd, RespMsg, Result) ->
+  RespMode = proplists:get_value(resp_mode, TxnConfig),
+  do_render_fail_result(RespMode, M, TxnConfig, RespCd, RespMsg, Result).
+
+do_render_fail_result(body, M, TxnConfig, RespCd, RespMsg, {proplist, PV}) when is_list(PV) ->
+  %% before model create successfully
+  %% return original PV , plus respcd/respmsg
+  PVReturn = PV ++ [{<<"respCode">>, RespCd}, {<<"respMsg">>, RespMsg}],
+  xfutils:proplist_to_iolist(PVReturn);
+do_render_fail_result(body, M, TxnConfig, RespCd, RespMsg, {model, Protocol}) when is_tuple(Protocol) ->
+  ok.
+
+

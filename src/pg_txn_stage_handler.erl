@@ -27,7 +27,7 @@ validate_format(PV) when is_list(PV) ->
     pg_mcht_protocol:validate_format(PV)
   catch
     throw:{validate_format_fail, RespCd, RespMsg} ->
-      throw({validate_format_fail, RespCd, RespMsg})
+      throw({validate_format_fail, RespCd, RespMsg, {proplist, PV}})
   end.
 
 
@@ -38,8 +38,8 @@ create_req_model(MIn, PV) when is_atom(MIn), is_list(PV) ->
   catch
     _:X ->
       ?LARGER_STACKTRACE_1(X),
-      lager:error("convert to mcht req error.PV = ~p", [PV]),
-      throw({create_mcht_req_model_stop, <<"99">>, <<"请求协议转换错误"/utf8>>})
+      lager:error("convert to mcht req [~p] error.PV = ~p", [MIn, PV]),
+      throw({create_mcht_req_model_stop, <<"99">>, <<"请求协议转换错误"/utf8>>, {proplist, PV}})
   end.
 
 %%-------------------------------------------------------------------
@@ -50,11 +50,11 @@ validate_biz(MIn, Protocol) when is_atom(MIn), is_tuple(Protocol) ->
     throw:{validate_fail, RespCd, RespMsg} ->
       lager:error("validate req model fail! RespCd = ~p,RespMsg = ~ts,Model =~p",
         [RespCd, RespMsg, Protocol]),
-      throw({validate_req_model_stop, RespCd, RespMsg, Protocol});
+      throw({validate_req_model_stop, RespCd, RespMsg, {model, MIn, Protocol}});
     _:X ->
       lager:error("Error = ~p,stack = ~s", [X, lager:pr_stacktrace(erlang:get_stacktrace())]),
       lager:error("validate req model error. Model = ~p", [Protocol]),
-      throw({validate_req_model_stop, <<"99">>, <<"请求交易验证失败"/utf8>>, Protocol})
+      throw({validate_req_model_stop, <<"99">>, <<"请求交易验证失败"/utf8>>, {model, MIn, Protocol}})
   end.
 
 %%-------------------------------------------------------------------
@@ -66,5 +66,5 @@ save_req_model(MIn, Protocol) when is_atom(MIn), is_tuple(Protocol) ->
     _ :X ->
       ?LARGER_STACKTRACE_1(X),
       lager:error("save req model error. Model = ~p", [Protocol]),
-      throw({save_req_model_stop, <<"99">>, <<"保存交易请求错误"/utf8>>})
+      throw({save_req_model_stop, <<"99">>, <<"保存交易请求错误"/utf8>>, {model, MIn, Protocol}})
   end.

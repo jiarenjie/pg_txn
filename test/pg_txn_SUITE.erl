@@ -14,6 +14,7 @@
 -export([]).
 
 -define(M_Repo, pg_txn_t_repo_mcht_txn_log_pt).
+-define(APP, pg_txn).
 
 setup() ->
   lager:start(),
@@ -101,7 +102,11 @@ env_init() ->
                   }
                 }
               ]
-            }
+            },
+            {resp_mode, body},
+            {fail_template, x},
+            {succ_template, x}
+
           ]
         }
 
@@ -120,8 +125,10 @@ my_test_() ->
     {
       inorder,
       [
-        fun mcht_txn_req_collect_test_1/0
-        , fun mchants_test_1/0
+        fun mchants_test_1/0
+        , fun pg_txn:txn_options_test_1/0
+        , fun pg_txn:stage_options_test_1/0
+        , fun mcht_txn_req_collect_test_1/0
 
       ]
     }
@@ -189,5 +196,17 @@ mcht_txn_req_collect_test_1() ->
     <<"全渠道"/utf8>>,
     <<"13552535506">>},
   ?assertEqual(Exp, Result),
+
+
+  %% error
+  PV1 = proplists:delete(<<"merchId">>, PV) ++ [{<<"merchId">>, <<"100">>}],
+  ?assertThrow({validate_req_model_stop, <<"31">>, <<"商户号不存在"/utf8>>, _},
+    stage_action(mcht_txn_req_collect, stage_handle_mcht_req, PV1)),
+
   ok.
 %%--------------------------------------------------------------------
+
+
+stage_action(M, Stage, Params) ->
+  Options = pg_txn:stage_options(M, Stage),
+  pg_txn:Stage(Params, Options).
