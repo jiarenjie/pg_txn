@@ -130,6 +130,8 @@ my_test_() ->
         , fun pg_txn:stage_options_test_1/0
         , fun mcht_txn_req_collect_test_1/0
 
+        , fun fail_render_test_1/0
+
       ]
     }
   }.
@@ -200,13 +202,30 @@ mcht_txn_req_collect_test_1() ->
 
   %% error
   PV1 = proplists:delete(<<"merchId">>, PV) ++ [{<<"merchId">>, <<"100">>}],
-  ?assertThrow({validate_req_model_stop, <<"31">>, <<"商户号不存在"/utf8>>, _},
+  ?assertThrow({validate_req_model_stop, <<"31">>, <<"商户号不存在"/utf8>>, {model, _, _}},
     stage_action(mcht_txn_req_collect, stage_handle_mcht_req, PV1)),
 
+  ?assertThrow({validate_format_fail, <<"99">>, _, {proplist, _}},
+    stage_action(mcht_txn_req_collect, stage_handle_mcht_req,
+      proplists:delete(<<"merchId">>, PV) ++ [{<<"merchId">>, <<"d">>}])),
+
+  ?assertThrow({validate_req_model_stop, <<"11">>, _, {model, _, _}},
+    stage_action(mcht_txn_req_collect, stage_handle_mcht_req,
+      proplists:delete(<<"signature">>, PV) ++ [{<<"signature">>, <<"AA">>}])),
   ok.
 %%--------------------------------------------------------------------
+fail_render_test_1() ->
+  PV = qs(collect) ++ [{<<"signature">>, sig(collect)}],
+%%  ?debugFmt("PV = ~p", [PV]),
 
+  Result = pg_txn:handle(mcht_txn_req_collect,
+    proplists:delete(<<"merchId">>, PV) ++ [{<<"merchId">>, <<"AA">>}]),
+  ?debugFmt("merchId fail render msg = ~ts", [iolist_to_binary(Result)]),
+  MatchResult = binary:match(iolist_to_binary(Result), <<"respCode=99">>),
+  ?assertNotEqual(nomatch, MatchResult),
+  ok.
 
+%%--------------------------------------------------------------------
 stage_action(M, Stage, Params) ->
   Options = pg_txn:stage_options(M, Stage),
   pg_txn:Stage(Params, Options).

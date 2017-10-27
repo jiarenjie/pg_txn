@@ -96,7 +96,7 @@ handle(M, Params) when is_atom(M) ->
 
   F =
     fun({stage, {Stage, StageOptions}}, LastParams) ->
-      ?debugFmt("before stage:~p , Params = ~p,Options = ~p", [Stage, LastParams, StageOptions]),
+%%      ?debugFmt("before stage:~p , Params = ~p,Options = ~p", [Stage, LastParams, StageOptions]),
       AccNew = ?MODULE:Stage(LastParams, StageOptions),
       AccNew
     end,
@@ -106,7 +106,7 @@ handle(M, Params) when is_atom(M) ->
     Result
   catch
     throw:{_, RespCd, RespMsg, FailResult} = X ->
-      ?debugFmt("X = ~p", [X]),
+%%      ?debugFmt("X = ~p", [X]),
       render_fail_result(M, TxnConfig, RespCd, RespMsg, FailResult);
     _:X ->
       ?debugFmt("X = ~p", [X])
