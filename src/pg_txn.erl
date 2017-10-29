@@ -36,6 +36,7 @@ stage_handle_mcht_req(PV, Options) when is_list(PV), is_list(Options) ->
   %% create model
   MIn = proplists:get_value(model_in, Options),
   _MRepo = proplists:get_value(model_repo, Options),
+
   MchtReq = pg_txn_stage_handler:create_req_model(MIn, PV),
 
   %% validate mcht req model
@@ -75,12 +76,12 @@ stage_options(MTxn, Stage) ->
   Stages = proplists:get_value(stages, TxnConfig),
 
   F = fun
-        ({stage, {StageName, Options}}, {StageName,AccIn}) ->
-          {StageName,Options};
+        ({stage, {StageName, Options}}, {StageName, AccIn}) ->
+          {StageName, Options};
         (_, Acc) ->
           Acc
       end,
-  {Stage,StageOptions} = lists:foldl(F, {Stage,undefined}, Stages),
+  {Stage, StageOptions} = lists:foldl(F, {Stage, undefined}, Stages),
   StageOptions.
 
 stage_options_test_1() ->
@@ -96,7 +97,6 @@ handle(M, Params) when is_atom(M) ->
 
   F =
     fun({stage, {Stage, StageOptions}}, LastParams) ->
-%%      ?debugFmt("before stage:~p , Params = ~p,Options = ~p", [Stage, LastParams, StageOptions]),
       AccNew = ?MODULE:Stage(LastParams, StageOptions),
       AccNew
     end,
@@ -106,10 +106,16 @@ handle(M, Params) when is_atom(M) ->
     Result
   catch
     throw:{_, RespCd, RespMsg, FailResult} = X ->
-%%      ?debugFmt("X = ~p", [X]),
-      render_fail_result(M, TxnConfig, RespCd, RespMsg, FailResult);
+      try
+        render_fail_result(M, TxnConfig, RespCd, RespMsg, FailResult)
+      catch
+        _:X ->
+          ?LARGER_STACKTRACE_1(X),
+          PVRespCdMsg = [{resp_code, RespCd}, {resp_msg, RespMsg}],
+          xfutils:proplist_to_iolist(PVRespCdMsg)
+      end;
     _:X ->
-      ?debugFmt("X = ~p", [X])
+      ?LARGER_STACKTRACE_1(X)
   end.
 
 %%====================================================================
@@ -119,12 +125,27 @@ render_fail_result(M, TxnConfig, RespCd, RespMsg, Result) ->
   RespMode = proplists:get_value(resp_mode, TxnConfig),
   do_render_fail_result(RespMode, M, TxnConfig, RespCd, RespMsg, Result).
 
-do_render_fail_result(body, M, TxnConfig, RespCd, RespMsg, {proplist, PV}) when is_list(PV) ->
+do_render_fail_result(body, MTxn, TxnConfig, RespCd, RespMsg, {proplist, PV})
+  when is_list(PV) ->
   %% before model create successfully
   %% return original PV , plus respcd/respmsg
   PVReturn = PV ++ [{<<"respCode">>, RespCd}, {<<"respMsg">>, RespMsg}],
   xfutils:proplist_to_iolist(PVReturn);
-do_render_fail_result(body, M, TxnConfig, RespCd, RespMsg, {model, Protocol}) when is_tuple(Protocol) ->
-  ok.
+do_render_fail_result(body, MTxn, TxnConfig, RespCd, RespMsg, {model, MIn, Protocol})
+  when is_atom(MTxn), is_atom(MIn), is_tuple(Protocol) ->
+  PVRespCdMsg = [{resp_code, RespCd}, {resp_msg, RespMsg}],
+
+  MTo = proplists:get_value(resp_protocol_model, TxnConfig),
+  RespProtocol = pg_convert:convert(MTo, Protocol, fail_resp),
+  %% validate it
+  ok = pg_mcht_protocol:validate_biz(MTo, RespProtocol),
+
+  RespProtocolWithResp = pg_model:set(MTo, RespProtocol, PVRespCdMsg),
+  {SignString, Sign} = pg_mcht_protocol:sign(MTo, RespProtocolWithResp),
+  RespProtocolWithSig = pg_model:set(MTo, RespProtocolWithResp, signature, Sign),
+  PostFields = [signature | MTo:sign_fields()],
+  In2OutMap = pg_mcht_protocol:in_2_out_map(),
+  pg_model:to(MTo, RespProtocolWithSig, {poststring, PostFields, In2OutMap}).
+
 
 

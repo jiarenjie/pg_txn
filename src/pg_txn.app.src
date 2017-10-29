@@ -26,7 +26,11 @@
                   }
                 }
               ]
-            }
+            },
+            {resp_mode, body},
+            {resp_protocol_model, pg_mcht_protocol_resp_collect},
+            {fail_template, x},
+            {succ_template, x}
           ]
         },
         {mcht_txn_req_pay,

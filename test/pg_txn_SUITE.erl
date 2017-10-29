@@ -77,7 +77,7 @@ env_init() ->
   Cfgs = [
     {pg_mcht_protocol,
       [
-        {debug, true},
+%%        {debug, true},
         {mcht_repo_name, pg_txn_t_repo_mchants_pt}
         , {mcht_txn_log_repo_name, pg_txn_t_repo_mcht_txn_log_pt}
       ]
@@ -104,6 +104,7 @@ env_init() ->
               ]
             },
             {resp_mode, body},
+            {resp_protocol_model, pg_mcht_protocol_resp_collect},
             {fail_template, x},
             {succ_template, x}
 
@@ -111,7 +112,32 @@ env_init() ->
         }
 
       ]
-    }
+    },
+    {lager,
+      [
+        {log_root, "/tmp/logs/"},
+        {handlers,
+          [
+            {lager_console_backend,
+              [debug,
+                {lager_default_formatter,
+                  [date, " ", time
+                    , " [", severity, "]"
+                    , {module, [
+                    module,
+                    {function, [":", function], ""},
+                    {line, [":", line], ""}], ""},
+                    {pid, ["@", pid], ""},
+                    message
+                    , "\n"
+                  ]
+                }
+              ]
+            },
+            {lager_file_backend, [{file, "error.log"}, {level, error}, {date, "$D23"}, {count, 60}]},
+            {lager_file_backend, [{file, "console.log"}, {level, debug}, {date, "$D23"}, {count, 60}]}
+          ]}
+      ]}
   ],
 
   pg_test_utils:env_init(Cfgs).
@@ -129,6 +155,8 @@ my_test_() ->
         , fun pg_txn:txn_options_test_1/0
         , fun pg_txn:stage_options_test_1/0
         , fun mcht_txn_req_collect_test_1/0
+
+        , fun create_req_model_test_1/0
 
         , fun fail_render_test_1/0
 
@@ -174,13 +202,9 @@ mchants_test_1() ->
   MMchants = pg_txn:repo_module(mchants),
   ?assertEqual([[gw_collect]], pg_repo:fetch_by(MMchants, 1, [payment_method])),
   ?assertEqual([[gw_collect]], pg_repo:fetch_by(MMchants, <<"001">>, [payment_method])),
-%%  ?debugFmt("Mchants 1 = ~p", [pg_repo:read(MMchants, 1)]),
-%%  ?debugFmt("Mchants 001 = ~p", [pg_repo:read(MMchants, <<"001">>)]),
-%%  ?debugFmt("Mchants 2 = ~p", [pg_repo:read(MMchants, 2)]),
   ok.
 %%--------------------------------------------------------------------
 mcht_txn_req_collect_test_1() ->
-%%  ?debugFmt("pg_mcht_protocol's env = ~p", [application:get_all_env(pg_mcht_protocol)]),
 
   PV = qs(collect) ++ [{<<"signature">>, sig(collect)}],
   {_, Result} = pg_txn:handle(mcht_txn_req_collect, PV),
@@ -209,23 +233,53 @@ mcht_txn_req_collect_test_1() ->
     stage_action(mcht_txn_req_collect, stage_handle_mcht_req,
       proplists:delete(<<"merchId">>, PV) ++ [{<<"merchId">>, <<"d">>}])),
 
-  ?assertThrow({validate_req_model_stop, <<"11">>, _, {model, _, _}},
+  ?assertThrow({validate_req_model_stop, <<"12">>, _, {model, _, _}},
     stage_action(mcht_txn_req_collect, stage_handle_mcht_req,
       proplists:delete(<<"signature">>, PV) ++ [{<<"signature">>, <<"AA">>}])),
   ok.
 %%--------------------------------------------------------------------
+create_req_model_test_1() ->
+  PVTxnAmtSmall = update_qs(pg_mcht_protocol_req_collect, qs(collect), [{<<"tranAmt">>, <<"1">>}]),
+  MIn = pg_mcht_protocol_req_collect,
+  ?assertEqual(<<>>, pg_txn_stage_handler:create_req_model(MIn, PVTxnAmtSmall)),
+
+  ok.
+%%--------------------------------------------------------------------
 fail_render_test_1() ->
   PV = qs(collect) ++ [{<<"signature">>, sig(collect)}],
-%%  ?debugFmt("PV = ~p", [PV]),
 
+  %% format error
   Result = pg_txn:handle(mcht_txn_req_collect,
     proplists:delete(<<"merchId">>, PV) ++ [{<<"merchId">>, <<"AA">>}]),
-  ?debugFmt("merchId fail render msg = ~ts", [iolist_to_binary(Result)]),
   MatchResult = binary:match(iolist_to_binary(Result), <<"respCode=99">>),
   ?assertNotEqual(nomatch, MatchResult),
+
+  %% validate req fail
+  PVTxnAmtSmall = update_qs(pg_mcht_protocol_req_collect, qs(collect), [{<<"tranAmt">>, <<"1">>}]),
+  ?assertEqual(<<>>, stage_action(mcht_txn_req_collect, stage_handle_mcht_req, PVTxnAmtSmall)),
+  Result1 = pg_txn:handle(mcht_txn_req_collect, PVTxnAmtSmall),
+  MatchResult1 = binary:match(iolist_to_binary(Result1), <<"respCode=12">>),
+  ?assertNotEqual(nomatch, MatchResult1),
+  MatchResult11 = binary:match(iolist_to_binary(Result1), <<"respMsg=交易金额太小"/utf8>>),
+  ?assertNotEqual(nomatch, MatchResult11),
   ok.
 
 %%--------------------------------------------------------------------
 stage_action(M, Stage, Params) ->
   Options = pg_txn:stage_options(M, Stage),
   pg_txn:Stage(Params, Options).
+
+%%--------------------------------------------------------------------
+update_qs(M, QS, UpdateKV) when is_list(QS), is_list(UpdateKV) ->
+  F = fun
+        ({Key, Value}, Acc) ->
+          proplists:delete(Key, Acc) ++ [{Key, Value}]
+      end,
+  UpdateQS = lists:foldl(F, QS, UpdateKV),
+
+  Protocol = pg_protocol:out_2_in(M, UpdateQS),
+  {_, Sig} = pg_mcht_protocol:sign(M, Protocol),
+  PWithSig = pg_model:set(M, Protocol, signature, Sig),
+  OutFields = [signature | M:sign_fields()],
+  pg_model:to(M, PWithSig, {proplists, OutFields, pg_mcht_protocol:in_2_out_map()}).
+
