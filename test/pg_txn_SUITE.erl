@@ -239,13 +239,18 @@ mcht_txn_req_collect_test_1() ->
   ok.
 %%--------------------------------------------------------------------
 create_req_model_test_1() ->
+  db_init(),
+
   PVTxnAmtSmall = update_qs(pg_mcht_protocol_req_collect, qs(collect), [{<<"tranAmt">>, <<"1">>}]),
   MIn = pg_mcht_protocol_req_collect,
-  ?assertEqual(<<>>, pg_txn_stage_handler:create_req_model(MIn, PVTxnAmtSmall)),
+
+  ?assertEqual(1, pg_model:get(MIn, pg_txn_stage_handler:create_req_model(MIn, PVTxnAmtSmall), txn_amt)),
 
   ok.
 %%--------------------------------------------------------------------
 fail_render_test_1() ->
+  db_init(),
+
   PV = qs(collect) ++ [{<<"signature">>, sig(collect)}],
 
   %% format error
@@ -256,9 +261,10 @@ fail_render_test_1() ->
 
   %% validate req fail
   PVTxnAmtSmall = update_qs(pg_mcht_protocol_req_collect, qs(collect), [{<<"tranAmt">>, <<"1">>}]),
-  ?assertEqual(<<>>, stage_action(mcht_txn_req_collect, stage_handle_mcht_req, PVTxnAmtSmall)),
+  ?assertThrow({validate_req_model_stop, <<"33">>, _, {model, pg_mcht_protocol_req_collect, _}},
+    stage_action(mcht_txn_req_collect, stage_handle_mcht_req, PVTxnAmtSmall)),
   Result1 = pg_txn:handle(mcht_txn_req_collect, PVTxnAmtSmall),
-  MatchResult1 = binary:match(iolist_to_binary(Result1), <<"respCode=12">>),
+  MatchResult1 = binary:match(iolist_to_binary(Result1), <<"respCode=33">>),
   ?assertNotEqual(nomatch, MatchResult1),
   MatchResult11 = binary:match(iolist_to_binary(Result1), <<"respMsg=交易金额太小"/utf8>>),
   ?assertNotEqual(nomatch, MatchResult11),

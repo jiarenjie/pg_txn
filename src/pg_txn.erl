@@ -138,7 +138,7 @@ do_render_fail_result(body, MTxn, TxnConfig, RespCd, RespMsg, {model, MIn, Proto
   MTo = proplists:get_value(resp_protocol_model, TxnConfig),
   RespProtocol = pg_convert:convert(MTo, Protocol, fail_resp),
   %% validate it
-  ok = pg_mcht_protocol:validate_biz(MTo, RespProtocol),
+%%  ok = pg_mcht_protocol:validate_biz(MTo, RespProtocol),
 
   RespProtocolWithResp = pg_model:set(MTo, RespProtocol, PVRespCdMsg),
   {SignString, Sign} = pg_mcht_protocol:sign(MTo, RespProtocolWithResp),
