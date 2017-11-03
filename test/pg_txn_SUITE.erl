@@ -23,6 +23,7 @@ setup() ->
   application:start(pg_mcht_protocol),
   application:start(pg_up_protocol),
   application:start(pg_convert),
+  application:start(up_config),
 
   pg_repo:drop(?M_Repo),
   pg_repo:init(?M_Repo),
@@ -82,6 +83,21 @@ env_init() ->
         , {mcht_txn_log_repo_name, pg_txn_t_repo_mcht_txn_log_pt}
       ]
     },
+    {
+      pg_convert,
+      [
+%%        {debug, true}
+      ]
+
+    },
+    {pg_up_protocol,
+      [
+        {mchants_repo_name, pg_txn_t_repo_mchants_pt}
+        , {up_repo_name, pg_txn_t_repo_up_txn_log_pt}
+        , {debug, true}
+
+      ]
+    },
     {pg_txn,
       [
         {debug, true}
@@ -99,6 +115,17 @@ env_init() ->
                       {model_in, pg_mcht_protocol_req_collect}
                       , {model_repo, pg_txn_t_repo_mcht_txn_log_pt}
                     ]
+                  }
+                },
+                {stage,
+                  {stage_gen_up_req,
+                    [
+                      {model_in, pg_mcht_protocol_req_collect}
+                      , {model_out, pg_up_protocol_req_collect}
+                      , {model_repo_in, pg_txn_t_repo_mcht_txn_log_pt}
+                      , {model_repo_out, pg_txn_t_repo_up_txn_log_pt}
+                    ]
+
                   }
                 }
               ]
@@ -206,8 +233,11 @@ mchants_test_1() ->
 %%--------------------------------------------------------------------
 mcht_txn_req_collect_test_1() ->
 
+
+  %% stage 1
   PV = qs(collect) ++ [{<<"signature">>, sig(collect)}],
-  {_, Result} = pg_txn:handle(mcht_txn_req_collect, PV),
+%%  {_, Result} = pg_txn:handle(mcht_txn_req_collect, PV),
+  {PMchtReq, RepoMcht} = stage_action(mcht_txn_req_collect, stage_handle_mcht_req, PV),
   Exp = {mcht_txn_log, {<<"00001">>, <<"20171021">>,
     <<"20171021095817473460847">>},
     collect, <<"00001">>, <<"20171021">>,
@@ -221,8 +251,13 @@ mcht_txn_req_collect_test_1() ->
     <<"01">>, <<"341126197709218366">>,
     <<"全渠道"/utf8>>,
     <<"13552535506">>},
-  ?assertEqual(Exp, Result),
+  ?assertEqual(Exp, RepoMcht),
 
+  %% stage 2
+  {PUpReq, RepoUp} = stage_action(mcht_txn_req_collect, stage_gen_up_req, {PMchtReq, RepoMcht}),
+  ?assertEqual([pk(collect), <<"6216261000000000018">>, <<"341126197709218366">>, <<"全渠道"/utf8>>, <<"13552535506">>],
+    pg_model:get(pg_txn_t_repo_up_txn_log_pt, RepoUp, [mcht_index_key, up_accNo, up_idNo, up_idName, up_mobile])),
+  ?debugFmt("PUpReq = ~p~nRepoUp = ~p", [PUpReq, RepoUp]),
 
   %% error
   PV1 = proplists:delete(<<"merchId">>, PV) ++ [{<<"merchId">>, <<"100">>}],

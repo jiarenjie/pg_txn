@@ -16,6 +16,7 @@
 -export([
   txn_options_test_1/0
   , stage_options_test_1/0
+  , stage_gen_up_req/2
 ]).
 -define(APP, ?MODULE).
 %%-------------------------------------------------------------------
@@ -46,6 +47,34 @@ stage_handle_mcht_req(PV, Options) when is_list(PV), is_list(Options) ->
   {P, Repo} = pg_txn_stage_handler:save_req_model(MIn, MchtReq),
   {P, Repo}.
 
+
+%%-----------------------------------------------------------------
+stage_gen_up_req({PMchtReq, RepoMchtTxnLog}, Options)
+  when is_tuple(PMchtReq), is_tuple(RepoMchtTxnLog), is_list(Options) ->
+  ?debugFmt("======================================================~n", []),
+  ?debugFmt("Options = ~p", [Options]),
+
+  %% convert to up req
+  MOut = proplists:get_value(model_out, Options),
+  ?debugFmt("Mout = ~p,PMchtReq = ~p", [MOut, PMchtReq]),
+  PUpReq = pg_convert:convert(MOut, PMchtReq),
+  ?debugFmt("PUpReq = ~p", [PUpReq]),
+
+  %% sign
+  Sig = pg_up_protocol:sign(MOut, PUpReq),
+  PUpReqWithSig = pg_model:set(MOut, PUpReq, signature, Sig),
+  ?debugFmt("PUpReqWithSig = ~p", [PUpReqWithSig]),
+
+  %% convert to up_txn_log
+  RepoUpReq = pg_convert:convert(MOut, PUpReq, save_req),
+  ?debugFmt("RepoUpReq = ~p", [RepoUpReq]),
+
+  %% save up_txn_log
+  ok = pg_repo:save(RepoUpReq),
+
+
+  {PUpReq, RepoUpReq}.
+%%-----------------------------------------------------------------
 
 %%-----------------------------------------------------------------
 repo_module(mchants = TableName) ->
