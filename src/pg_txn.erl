@@ -24,7 +24,7 @@
 -define(APP, ?MODULE).
 %%-------------------------------------------------------------------
 -define(LARGER_STACKTRACE_1(X),
-  lager:error("Error =~p,stacktrace=~s", [X, lager:pr_stacktrace(erlang:get_stacktrace())])).
+  lager:error("Error =~p,stacktrace=~ts", [X, iolist_to_binary(lager:pr_stacktrace(erlang:get_stacktrace()))])).
 %%====================================================================
 %% API functions
 %%====================================================================
@@ -110,7 +110,7 @@ stage_send_up_req({PUpReq, RepoUpReq}, Options)
 
 %%-----------------------------------------------------------------
 %% stage 4
-stage_handle_up_resp(Body, Options) when is_binary(Body) ->
+stage_handle_up_resp({Status, Headers, Body}, Options) when is_binary(Body) ->
   ?debugFmt("Enter stage_handle_up_resp ====================", []),
   PV = xfutils:parse_post_body(Body),
   MIn = proplists:get_value(model_in, Options),

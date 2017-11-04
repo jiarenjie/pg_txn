@@ -206,6 +206,7 @@ my_test_() ->
         , fun mcht_txn_req_collect_test_1/0
 
         , fun create_req_model_test_1/0
+        , fun mcht_txn_req_collect_test_2/0
 
         , fun fail_render_test_1/0
 
@@ -253,12 +254,17 @@ mchants_test_1() ->
   ?assertEqual([[gw_collect1]], pg_repo:fetch_by(MMchants, <<"001">>, [payment_method])),
   ok.
 %%--------------------------------------------------------------------
+req_collect_pv() ->
+  PV = qs(collect) ++ [{<<"signature">>, sig(collect)}],
+  PV.
+
 mcht_txn_req_collect_test_1() ->
   TxnType = mcht_txn_req_collect,
 
 
   %% stage 1,handle_mcht_req
-  PV = qs(collect) ++ [{<<"signature">>, sig(collect)}],
+%%  PV = qs(collect) ++ [{<<"signature">>, sig(collect)}],
+  PV = req_collect_pv(),
 %%  {_, Result} = pg_txn:handle(mcht_txn_req_collect, PV),
   {PMchtReq, RepoMcht} = stage_action(TxnType, stage_handle_mcht_req, PV),
   Exp = {mcht_txn_log, {<<"00001">>, <<"20171021">>,
@@ -289,7 +295,7 @@ mcht_txn_req_collect_test_1() ->
   ?assertEqual(<<"UTF-8">>, proplists:get_value(<<"encoding">>, xfutils:parse_post_body(Body))),
 
   %% stage 4,handle_up_resp
-  {RepoUpNew, RepoMchtNew} = stage_action(TxnType, stage_handle_up_resp, Body),
+  {RepoUpNew, RepoMchtNew} = stage_action(TxnType, stage_handle_up_resp, {Status,Headers,Body}),
   ?debugFmt("RepoUpNew = ~ts~nRepoMchtNew = ~ts", [pg_model:pr(pg_txn:repo_module(up_txn_log), RepoUpNew),
     pg_model:pr(pg_txn:repo_module(mcht_txn_log), RepoMchtNew)]),
   ?assertEqual(50, pg_model:get(pg_txn:repo_module(up_txn_log), RepoUpNew, up_txnAmt)),
@@ -315,6 +321,19 @@ mcht_txn_req_collect_test_1() ->
     stage_action(mcht_txn_req_collect, stage_handle_mcht_req,
       proplists:delete(<<"signature">>, PV) ++ [{<<"signature">>, <<"AA">>}])),
   ok.
+%%--------------------------------------------------------------------
+mcht_txn_req_collect_test_2() ->
+  TxnType = mcht_txn_req_collect,
+
+  %% full link test
+  db_init(),
+
+  PV = req_collect_pv(),
+  ResultBody = pg_txn:handle(TxnType, PV),
+  MatchResult = binary:match(iolist_to_binary(ResultBody), <<"tranId=20171021095817473460847">>),
+  ?assertNotEqual(nomatch, MatchResult),
+  ok.
+
 %%--------------------------------------------------------------------
 create_req_model_test_1() ->
   db_init(),
