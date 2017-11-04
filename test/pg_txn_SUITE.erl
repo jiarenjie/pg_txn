@@ -81,6 +81,7 @@ env_init() ->
 %%        {debug, true},
         {mcht_repo_name, pg_txn_t_repo_mchants_pt}
         , {mcht_txn_log_repo_name, pg_txn_t_repo_mcht_txn_log_pt}
+        , {up_txn_log_repo_name, pg_txn_t_repo_up_txn_log_pt}
       ]
     },
     {
@@ -137,6 +138,15 @@ env_init() ->
                   {stage_handle_up_resp,
                     [
                       {model_in, pg_up_protocol_resp_collect}
+                      , {model_out, pg_mcht_protocol_resp_collect}
+                    ]
+                  }
+                },
+                {stage,
+                  {stage_return_mcht_resp,
+                    [
+                      {model_in, pg_up_protocol_resp_collect}
+                      , {model_out, pg_mcht_protocol_resp_collect}
                     ]
                   }
                 }
@@ -285,6 +295,11 @@ mcht_txn_req_collect_test_1() ->
   ?assertEqual(50, pg_model:get(pg_txn:repo_module(up_txn_log), RepoUpNew, up_txnAmt)),
 
   %% stage 5,send_mcht_resp
+  ReturnBody = stage_action(TxnType, stage_return_mcht_resp, {RepoUpNew, RepoMchtNew}),
+  ?debugFmt("ReturnBody = ~ts", [ReturnBody]),
+  QueryId = pg_model:get(pg_txn:repo_module(up_txn_log), RepoUpNew, up_orderId),
+  MatchResult = binary:match(iolist_to_binary(ReturnBody), <<"queryId=", QueryId/binary>>),
+  ?assertNotEqual(nomatch, MatchResult),
 
 
   %% error

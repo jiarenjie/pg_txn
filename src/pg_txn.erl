@@ -127,9 +127,13 @@ stage_handle_up_resp(Body, Options) when is_binary(Body) ->
 
   %% update_mcht_txn_log
   MRepoMcht = pg_txn:repo_module(mcht_txn_log),
-  MchtIndexKey = pg_model:get(MRepoUp, RepoUpNew, mcht_index_key),
-  {ok, RepoMchtNew} = pg_repo:update_pk(MRepoMcht, MchtIndexKey,
-    [{resp_code, UpRespCd}, {resp_msg, UpRespMsg}, {txn_status, xfutils:up_resp_code_2_txn_status(UpRespCd)}]),
+  MOut = proplists:get_value(model_out, Options),
+  VL = pg_convert:convert(MOut, RepoUpNew),
+  {ok, RepoMchtNew} = pg_repo:update(MRepoMcht, VL),
+  ?debugFmt("VL = ~p~nRepoMchtNew = ~p", [VL, RepoMchtNew]),
+  %%  MchtIndexKey = pg_model:get(MRepoUp, RepoUpNew, mcht_index_key),
+  %%  {ok, RepoMchtNew} = pg_repo:update_pk(MRepoMcht, MchtIndexKey,
+  %%    [{resp_code, UpRespCd}, {resp_msg, UpRespMsg}, {txn_status, xfutils:up_resp_code_2_txn_status(UpRespCd)}]),
 
   ?debugFmt("MRepoUp = ~ts~nMRepoMcht = ~ts", [pg_model:pr(MRepoUp, RepoUpNew), pg_model:pr(MRepoMcht, RepoMchtNew)]),
   {RepoUpNew, RepoMchtNew}.
@@ -138,14 +142,19 @@ stage_handle_up_resp(Body, Options) when is_binary(Body) ->
 %% stage 5
 stage_return_mcht_resp({RepoUpResp, RepoMchtNew}, Options) when is_tuple(RepoUpResp) ->
   MOut = proplists:get_value(model_out, Options),
-  MRepoUp = pg_txn:repo_module(up_txn_log),
   %% update mcht_txn_log
-  RepoMchtResp = pg_convert:convert(MOut, RepoUpResp),
+  PMchtResp = pg_convert:convert(MOut, RepoMchtNew, normal_resp),
+  ?debugFmt("PMchtResp = ~p", [PMchtResp]),
 
-  %% convert to ProtocolMchtResp
+  {SignString, Sig} = pg_mcht_protocol:sign(MOut, PMchtResp),
+  lager:debug("Return mcht resp ,signstring = ~ts,sig=~p", [SignString, Sig]),
+  ?debugFmt("Return mcht resp ,signstring = ~ts,sig=~p", [SignString, Sig]),
+
+  PMchtRespWithSig = pg_model:set(MOut, PMchtResp, signature, Sig),
+  ?debugFmt("PMchtRespWithSig = ~ts", [pg_model:pr(MOut, PMchtRespWithSig)]),
 
   %% resp body
-  ok.
+  pg_mcht_protocol:in_2_out(MOut, PMchtRespWithSig, post).
 %%-----------------------------------------------------------------
 repo_module(mchants = TableName) ->
   {ok, Module} = application:get_env(?APP, mcht_repo_name),
