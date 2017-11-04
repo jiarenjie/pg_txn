@@ -279,9 +279,10 @@ mcht_txn_req_collect_test_1() ->
   ?assertEqual(<<"UTF-8">>, proplists:get_value(<<"encoding">>, xfutils:parse_post_body(Body))),
 
   %% stage 4,handle_up_resp
-  RepoNew = stage_action(TxnType, stage_handle_up_resp, Body),
-  ?debugFmt("RepoNew = ~ts", [pg_model:pr(pg_txn:repo_module(up_txn_log), RepoNew)]),
-  ?assertEqual(50, pg_model:get(pg_txn:repo_module(up_txn_log), RepoNew, up_txnAmt)),
+  {RepoUpNew, RepoMchtNew} = stage_action(TxnType, stage_handle_up_resp, Body),
+  ?debugFmt("RepoUpNew = ~ts~nRepoMchtNew = ~ts", [pg_model:pr(pg_txn:repo_module(up_txn_log), RepoUpNew),
+    pg_model:pr(pg_txn:repo_module(mcht_txn_log), RepoMchtNew)]),
+  ?assertEqual(50, pg_model:get(pg_txn:repo_module(up_txn_log), RepoUpNew, up_txnAmt)),
 
   %% stage 5,send_mcht_resp
 

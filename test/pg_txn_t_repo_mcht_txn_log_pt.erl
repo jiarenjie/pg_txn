@@ -18,6 +18,9 @@
   table_config/0
 ]).
 
+-export([
+  pr_formatter/1
+]).
 -compile(export_all).
 %%-------------------------------------------------------------
 -define(TBL, mcht_txn_log).
@@ -84,3 +87,13 @@ table_config() ->
 
   }.
 
+pr_formatter(Field)
+  when (Field =:= id_no)
+  or (Field =:= id_name)
+  or (Field =:= mobile)
+  or (Field =:= order_desc)
+  or (Field =:= resp_msg)
+  ->
+  string;
+pr_formatter(_) ->
+  ok.

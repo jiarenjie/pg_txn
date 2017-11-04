@@ -19,6 +19,7 @@
   , stage_gen_up_req/2
   , stage_send_up_req/2
   , stage_handle_up_resp/2
+  , stage_return_mcht_resp/2
 ]).
 -define(APP, ?MODULE).
 %%-------------------------------------------------------------------
@@ -118,13 +119,33 @@ stage_handle_up_resp(Body, Options) when is_binary(Body) ->
   [UpIndexKey, UpRespCd, UpRespMsg] = pg_up_protocol:get(MIn, PUpResp,
     [up_index_key, respCode, respMsg]),
 
+  %% update up_txn_log
   ?debugFmt("UpIndexKey = ~p,UpRespCd = ~p,UpRespMsg = ~p", [UpIndexKey, UpRespCd, UpRespMsg]),
   MRepoUp = pg_txn:repo_module(up_txn_log),
   {ok, RepoUpNew} = pg_repo:update(MRepoUp, {up_index_key, UpIndexKey},
     [{up_respCode, UpRespCd}, {up_respMsg, UpRespMsg}, {txn_status, xfutils:up_resp_code_2_txn_status(UpRespCd)}]),
-  ?debugFmt("MRepoUp = ~ts", [pg_model:pr(MRepoUp, RepoUpNew)]),
-  RepoUpNew.
 
+  %% update_mcht_txn_log
+  MRepoMcht = pg_txn:repo_module(mcht_txn_log),
+  MchtIndexKey = pg_model:get(MRepoUp, RepoUpNew, mcht_index_key),
+  {ok, RepoMchtNew} = pg_repo:update_pk(MRepoMcht, MchtIndexKey,
+    [{resp_code, UpRespCd}, {resp_msg, UpRespMsg}, {txn_status, xfutils:up_resp_code_2_txn_status(UpRespCd)}]),
+
+  ?debugFmt("MRepoUp = ~ts~nMRepoMcht = ~ts", [pg_model:pr(MRepoUp, RepoUpNew), pg_model:pr(MRepoMcht, RepoMchtNew)]),
+  {RepoUpNew, RepoMchtNew}.
+
+%%-----------------------------------------------------------------
+%% stage 5
+stage_return_mcht_resp({RepoUpResp, RepoMchtNew}, Options) when is_tuple(RepoUpResp) ->
+  MOut = proplists:get_value(model_out, Options),
+  MRepoUp = pg_txn:repo_module(up_txn_log),
+  %% update mcht_txn_log
+  RepoMchtResp = pg_convert:convert(MOut, RepoUpResp),
+
+  %% convert to ProtocolMchtResp
+
+  %% resp body
+  ok.
 %%-----------------------------------------------------------------
 repo_module(mchants = TableName) ->
   {ok, Module} = application:get_env(?APP, mcht_repo_name),

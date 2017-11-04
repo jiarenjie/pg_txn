@@ -45,6 +45,14 @@
                   {stage_handle_up_resp,
                     [
                       {model_in, pg_up_protocol_resp_collect}
+                      , {model_out, pg_mcht_protocol_resp_collect}
+                    ]
+                  }
+                },
+                {stage,
+                  {stage_return_mcht_resp,
+                    [
+                      {model_in, pg_up_protocol_resp_collect}
                     ]
                   }
                 }
