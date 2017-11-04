@@ -52,7 +52,7 @@ validate_biz(MIn, Protocol) when is_atom(MIn), is_tuple(Protocol) ->
         [RespCd, RespMsg, Protocol]),
       throw({validate_req_model_stop, RespCd, RespMsg, {model, MIn, Protocol}});
     _:X ->
-      lager:error("Error = ~p,stack = ~s", [X, lager:pr_stacktrace(erlang:get_stacktrace())]),
+      ?LARGER_STACKTRACE_1(X),
       lager:error("validate req model error. Model = ~p", [Protocol]),
       throw({validate_req_model_stop, <<"99">>, <<"请求交易验证失败"/utf8>>, {model, MIn, Protocol}})
   end.

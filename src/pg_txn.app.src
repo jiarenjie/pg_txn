@@ -24,6 +24,22 @@
                       , {model_repo, repo_mcht_txn_log_pt}
                     ]
                   }
+                },
+                {stage,
+                  {stage_gen_up_req,
+                    [
+                      {model_in, pg_mcht_protocol_req_collect}
+                      , {model_out, pg_up_protocol_req_collect}
+                    ]
+
+                  }
+                },
+                {stage,
+                  {stage_send_up_req,
+                    [
+                      {model_in, pg_up_protocol_req_collect}
+                    ]
+                  }
                 }
               ]
             },

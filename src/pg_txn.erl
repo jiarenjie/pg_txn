@@ -17,6 +17,7 @@
   txn_options_test_1/0
   , stage_options_test_1/0
   , stage_gen_up_req/2
+  , stage_send_up_req/2
 ]).
 -define(APP, ?MODULE).
 %%-------------------------------------------------------------------
@@ -75,6 +76,30 @@ stage_gen_up_req({PMchtReq, RepoMchtTxnLog}, Options)
 
   {PUpReq, RepoUpReq}.
 %%-----------------------------------------------------------------
+stage_send_up_req({PUpReq, RepoUpReq}, Options)
+  when is_tuple(PUpReq), is_tuple(RepoUpReq), is_list(Options) ->
+  %% convert PUpReq to post
+  MIn = proplists:get_value(model_in, Options),
+  PostBody = pg_up_protocol:in_2_out(MIn, PUpReq, post),
+
+  %% send to unionpay
+  PostUrl = up_config:get_config(up_back_url),
+  ?debugFmt("===========================================", []),
+  ?debugFmt("PostBody = ~ts~nPostUrl = ~p", [PostBody, PostUrl]),
+
+  %% receive response
+  try
+    {ok, {Status, Headers, Body}} = httpc:request(post,
+      {binary_to_list(PostUrl), [], "application/x-www-form-urlencoded", iolist_to_binary(PostBody)},
+      [], []),
+    ?debugFmt("http Statue = ~p~nHeaders  = ~p~nBody=~ts~n", [Status, Headers, Body]),
+    {Status, Headers, Body}
+  catch
+    _:X ->
+      ?LARGER_STACKTRACE_1(X),
+      lager:error("send up req to unionpay error,PostBody = ~ts", [PostBody]),
+      throw({send_up_req_stop, <<"99">>, <<"上游通道接受错误">>, {model, MIn, PUpReq}})
+  end.
 
 %%-----------------------------------------------------------------
 repo_module(mchants = TableName) ->
