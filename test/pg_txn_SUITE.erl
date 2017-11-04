@@ -42,7 +42,7 @@ db_init() ->
       [
         [
           {id, 1}
-          , {payment_method, [gw_collect]}
+          , {payment_method, [gw_collect1]}
         ],
         [
           {id, 2}
@@ -130,6 +130,13 @@ env_init() ->
                   {stage_send_up_req,
                     [
                       {model_in, pg_up_protocol_req_collect}
+                    ]
+                  }
+                },
+                {stage,
+                  {stage_handle_up_resp,
+                    [
+                      {model_in, pg_up_protocol_resp_collect}
                     ]
                   }
                 }
@@ -232,8 +239,8 @@ sign_string(collect) ->
 %%--------------------------------------------------------------------
 mchants_test_1() ->
   MMchants = pg_txn:repo_module(mchants),
-  ?assertEqual([[gw_collect]], pg_repo:fetch_by(MMchants, 1, [payment_method])),
-  ?assertEqual([[gw_collect]], pg_repo:fetch_by(MMchants, <<"001">>, [payment_method])),
+  ?assertEqual([[gw_collect1]], pg_repo:fetch_by(MMchants, 1, [payment_method])),
+  ?assertEqual([[gw_collect1]], pg_repo:fetch_by(MMchants, <<"001">>, [payment_method])),
   ok.
 %%--------------------------------------------------------------------
 mcht_txn_req_collect_test_1() ->
@@ -272,6 +279,9 @@ mcht_txn_req_collect_test_1() ->
   ?assertEqual(<<"UTF-8">>, proplists:get_value(<<"encoding">>, xfutils:parse_post_body(Body))),
 
   %% stage 4,handle_up_resp
+  RepoNew = stage_action(TxnType, stage_handle_up_resp, Body),
+  ?debugFmt("RepoNew = ~ts", [pg_model:pr(pg_txn:repo_module(up_txn_log), RepoNew)]),
+  ?assertEqual(50, pg_model:get(pg_txn:repo_module(up_txn_log), RepoNew, up_txnAmt)),
 
   %% stage 5,send_mcht_resp
 

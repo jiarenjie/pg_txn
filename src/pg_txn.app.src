@@ -40,6 +40,13 @@
                       {model_in, pg_up_protocol_req_collect}
                     ]
                   }
+                },
+                {stage,
+                  {stage_handle_up_resp,
+                    [
+                      {model_in, pg_up_protocol_resp_collect}
+                    ]
+                  }
                 }
               ]
             },

@@ -18,6 +18,7 @@
   , stage_options_test_1/0
   , stage_gen_up_req/2
   , stage_send_up_req/2
+  , stage_handle_up_resp/2
 ]).
 -define(APP, ?MODULE).
 %%-------------------------------------------------------------------
@@ -26,6 +27,7 @@
 %%====================================================================
 %% API functions
 %%====================================================================
+%% stage 1
 -spec stage_handle_mcht_req(PV, Options) -> MchtTxnLog when
   PV :: proplists:proplist(),
   Options :: list(),
@@ -50,6 +52,7 @@ stage_handle_mcht_req(PV, Options) when is_list(PV), is_list(Options) ->
 
 
 %%-----------------------------------------------------------------
+%% stage 2
 stage_gen_up_req({PMchtReq, RepoMchtTxnLog}, Options)
   when is_tuple(PMchtReq), is_tuple(RepoMchtTxnLog), is_list(Options) ->
   ?debugFmt("======================================================~n", []),
@@ -76,6 +79,7 @@ stage_gen_up_req({PMchtReq, RepoMchtTxnLog}, Options)
 
   {PUpReq, RepoUpReq}.
 %%-----------------------------------------------------------------
+%% stage 3
 stage_send_up_req({PUpReq, RepoUpReq}, Options)
   when is_tuple(PUpReq), is_tuple(RepoUpReq), is_list(Options) ->
   %% convert PUpReq to post
@@ -90,8 +94,10 @@ stage_send_up_req({PUpReq, RepoUpReq}, Options)
   %% receive response
   try
     {ok, {Status, Headers, Body}} = httpc:request(post,
-      {binary_to_list(PostUrl), [], "application/x-www-form-urlencoded", iolist_to_binary(PostBody)},
-      [], []),
+      {binary_to_list(PostUrl), [], "application/x-www-form-urlencoded", iolist_to_binary(PostBody)}, %% Request
+      [],                 %% HTTPOptions
+      [{body_format, binary}]                %% Options
+    ),
     ?debugFmt("http Statue = ~p~nHeaders  = ~p~nBody=~ts~n", [Status, Headers, Body]),
     {Status, Headers, Body}
   catch
@@ -100,6 +106,24 @@ stage_send_up_req({PUpReq, RepoUpReq}, Options)
       lager:error("send up req to unionpay error,PostBody = ~ts", [PostBody]),
       throw({send_up_req_stop, <<"99">>, <<"上游通道接受错误">>, {model, MIn, PUpReq}})
   end.
+
+%%-----------------------------------------------------------------
+%% stage 4
+stage_handle_up_resp(Body, Options) when is_binary(Body) ->
+  ?debugFmt("Enter stage_handle_up_resp ====================", []),
+  PV = xfutils:parse_post_body(Body),
+  MIn = proplists:get_value(model_in, Options),
+  PUpResp = pg_protocol:out_2_in(MIn, PV),
+  ?debugFmt("PUpResp = ~p", [PUpResp]),
+  [UpIndexKey, UpRespCd, UpRespMsg] = pg_up_protocol:get(MIn, PUpResp,
+    [up_index_key, respCode, respMsg]),
+
+  ?debugFmt("UpIndexKey = ~p,UpRespCd = ~p,UpRespMsg = ~p", [UpIndexKey, UpRespCd, UpRespMsg]),
+  MRepoUp = pg_txn:repo_module(up_txn_log),
+  {ok, RepoUpNew} = pg_repo:update(MRepoUp, {up_index_key, UpIndexKey},
+    [{up_respCode, UpRespCd}, {up_respMsg, UpRespMsg}, {txn_status, xfutils:up_resp_code_2_txn_status(UpRespCd)}]),
+  ?debugFmt("MRepoUp = ~ts", [pg_model:pr(MRepoUp, RepoUpNew)]),
+  RepoUpNew.
 
 %%-----------------------------------------------------------------
 repo_module(mchants = TableName) ->

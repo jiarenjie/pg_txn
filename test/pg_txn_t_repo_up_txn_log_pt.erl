@@ -11,11 +11,14 @@
 -behavior(pg_repo).
 -author("simon").
 
-%%-define(BH, behaviour_repo).
 %% API
 %% callbacks
 -export([
   table_config/0
+]).
+
+-export([
+  pr_formatter/1
 ]).
 
 -compile(export_all).
@@ -89,3 +92,15 @@ table_config() ->
   }
 
   }.
+
+pr_formatter(Field)
+  when (Field =:= up_consumerInfo)
+  or (Field =:= up_accNo)
+  or (Field =:= up_idNo)
+  or (Field =:= up_idName)
+  or (Field =:= up_mobile)
+  ->
+  string;
+pr_formatter(_) ->
+  ok.
+
