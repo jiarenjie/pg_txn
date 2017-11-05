@@ -78,7 +78,7 @@ stage_gen_up_req({PMchtReq, RepoMchtTxnLog}, Options)
   ok = pg_repo:save(RepoUpReq),
 
 
-  {PUpReq, RepoUpReq}.
+  {PUpReqWithSig, RepoUpReq}.
 %%-----------------------------------------------------------------
 %% stage 3
 stage_send_up_req({PUpReq, RepoUpReq}, Options)
