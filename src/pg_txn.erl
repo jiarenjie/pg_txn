@@ -207,6 +207,7 @@ handle(M, Params) when is_atom(M) ->
 
   F =
     fun({stage, {Stage, StageOptions}}, LastParams) ->
+      lager:debug("Enter stage=~p,Params = ~p,Options=~p", [Stage, LastParams, StageOptions]),
       AccNew = ?MODULE:Stage(LastParams, StageOptions),
       AccNew
     end,
