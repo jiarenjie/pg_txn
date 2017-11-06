@@ -59,6 +59,7 @@ stage_gen_up_req({PMchtReq, RepoMchtTxnLog}, Options)
   ?debugFmt("======================================================~n", []),
   ?debugFmt("Options = ~p", [Options]),
 
+
   %% convert to up req
   MOut = proplists:get_value(model_out, Options),
   ?debugFmt("Mout = ~p,PMchtReq = ~p", [MOut, PMchtReq]),
@@ -100,6 +101,7 @@ stage_send_up_req({PUpReq, RepoUpReq}, Options)
       [{body_format, binary}]                %% Options
     ),
     ?debugFmt("http Statue = ~p~nHeaders  = ~p~nBody=~ts~n", [Status, Headers, Body]),
+    lager:debug("http Statue = ~p~nHeaders  = ~p~nBody=~ts~n", [Status, Headers, Body]),
     {Status, Headers, Body}
   catch
     _:X ->
@@ -215,10 +217,14 @@ handle(M, Params) when is_atom(M) ->
   catch
     throw:{_, RespCd, RespMsg, FailResult} = X ->
       try
+        lager:error("before render_fail_result, M = ~p,TxnConfig = ~p,RespCd = ~p,RespMsg = ~ts,FailResult = ~p",
+          [M, TxnConfig, RespCd, RespMsg, FailResult]),
         render_fail_result(M, TxnConfig, RespCd, RespMsg, FailResult)
       catch
         _:X ->
           ?LARGER_STACKTRACE_1(X),
+          lager:error("error on render_fail_result,return resp_cd = ~p,rsp_msg = ~ts",
+            [RespCd, RespMsg]),
           PVRespCdMsg = [{resp_code, RespCd}, {resp_msg, RespMsg}],
           xfutils:proplist_to_iolist(PVRespCdMsg)
       end;
