@@ -92,6 +92,7 @@ stage_send_up_req({PUpReq, RepoUpReq}, Options)
   PostUrl = up_config:get_config(up_back_url),
   ?debugFmt("===========================================", []),
   ?debugFmt("PostBody = ~ts~nPostUrl = ~p", [PostBody, PostUrl]),
+  lager:debug("PostBody = ~ts~nPostUrl = ~p", [PostBody, PostUrl]),
 
   %% receive response
   try
