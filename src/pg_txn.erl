@@ -153,8 +153,11 @@ stage_return_mcht_resp({RepoUpResp, RepoMchtNew}, Options) when is_tuple(RepoUpR
   lager:debug("Return mcht resp ,signstring = ~ts,sig=~p", [SignString, Sig]),
   ?debugFmt("Return mcht resp ,signstring = ~ts,sig=~p", [SignString, Sig]),
 
+
   PMchtRespWithSig = pg_model:set(MOut, PMchtResp, signature, Sig),
   ?debugFmt("PMchtRespWithSig = ~ts", [pg_model:pr(MOut, PMchtRespWithSig)]),
+  ?debugFmt("Resp msg verify result = ~p", [pg_mcht_protocol:verify(MOut, PMchtRespWithSig)]),
+  lager:debug("Resp msg verify result = ~p", [pg_mcht_protocol:verify(MOut, PMchtRespWithSig)]),
 
   %% resp body
   pg_mcht_protocol:in_2_out(MOut, PMchtRespWithSig, post).
