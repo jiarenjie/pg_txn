@@ -38,6 +38,7 @@
   , mcht_short_name = <<"">> :: name()
   , status = normal :: status()
   , payment_method = [gw_netbank] :: payment_method()
+  , sign_method = rsa_hex
   , up_mcht_id = <<"">> :: binary()
   , quota = [{txn, -1}, {daily, -1}, {monthly, -1}] :: list()
   , up_term_no = <<"12345678">> :: binary()
