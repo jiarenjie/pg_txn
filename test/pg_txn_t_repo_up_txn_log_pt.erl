@@ -104,3 +104,28 @@ pr_formatter(Field)
 pr_formatter(_) ->
   ok.
 
+convert_config() ->
+  [
+    {default,
+      [
+        {to, proplists},
+        {from,
+          [
+            {{pg_txn, repo_module, [up_txn_log]},     %% dynamic up_txn_log repo name
+              [
+                {txn_status, txn_status}
+                , {resp_code, up_respCode}
+                , {resp_msg, up_respMsg}
+                , {query_id, up_orderId}
+                , {mcht_index_key, mcht_index_key}
+                , {settle_date, up_settleDate}
+              ]
+
+            }
+
+          ]
+        }
+      ]
+    }
+  ].
+

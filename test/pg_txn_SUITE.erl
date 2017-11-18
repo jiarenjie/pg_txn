@@ -24,6 +24,15 @@ setup() ->
   application:start(pg_up_protocol),
   application:start(pg_convert),
   application:start(up_config),
+  application:start(inets),
+  inets:start(httpd, [
+    {module, [mod_esi]},
+    {port, 9999},
+    {server_name, "localhost"},
+    {document_root, "."},
+    {server_root, "."},
+    {erl_script_alias, {"/esi", [pg_txn_echo_server]}}
+  ]),
 
   pg_repo:drop(?M_Repo),
   pg_repo:init(?M_Repo),
@@ -211,6 +220,36 @@ env_init() ->
             {succ_template, x}
 
           ]
+        },
+        {up_txn_info_collect,
+          [
+            {stages,
+              [
+                {stage,
+                  {stage_handle_up_info,
+                    [
+                      {model_in, pg_up_protocol_info_collect}
+                      , {model_out, pg_txn_t_repo_up_txn_log_pt}
+                    ]
+                  }
+                },
+                {stage,
+                  {stage_return_mcht_info,
+                    [
+                      {model_in, pg_txn_t_repo_up_txn_log_pt}
+                      , {model_out, pg_mcht_protocol_info_collect}
+
+                    ]
+                  }}
+
+              ]
+            },
+            {resp_mode, body},
+            {resp_protocol_model, pg_mcht_protocol_resp_batch_collect},
+            {fail_template, x},
+            {succ_template, x}
+          ]
+
         }
 
       ]
@@ -266,6 +305,10 @@ my_test_() ->
         %% batch collect
         , fun batch_collect_test_1/0
 
+        , fun echo_server_test_1/0
+
+        , fun info_collect_test_1/0
+
       ]
     }
   }.
@@ -299,7 +342,35 @@ qs(batch_collect) ->
     , {<<"batchNo">>, <<"0009">>}
     , {<<"fileContent">>, <<"eJx9kM1KAzEQx++FvkqZ/2STTY7iyUtPPXjVbcQeurukK1iZF5BCT3oqQg++gCeliE/Tj9dwtkrxA00CEzK/mV8Y26MeCQzpEiPS7VRpGNPJUIqrlGJZTI+rYZTmujwaN3JWFINpHdvYr5SYNNU4pv5Yzkc3+0QRUzO6GNSfF21TX1ZlVLiuJs2kSKO66XbIcyvcS43JIbBOPr5AEMdgdmBiIs4pU042r8v1y60oYZXQYwyBgZArAw45TgXekbOOtEK2y+f122zzdL97XP3w+Zz3PvvLp3mwDYaNbB/mm8Xiu8+wVV8AOLOA06Fl3uXInHP/+8yfPn33IYOX3Xy2Xt198QGkGyFQGzO0QzK+bQEof/C9A0jokSU=">>}
     , {<<"reqReserved">>, <<"eeee">>}
+  ];
+qs(up_info_collect) ->
+  [
+    {<<"accNo">>, <<"y2diank/+z3sOUUEw68T4BgK2pgdKG1SuPkJi5Or1b/npHxwdor7gQpy3Cwejo9hJmhk8zwoS0reNkaT9x4QHzc9A7auFouODHVbvFfnhYXXLU5f6WIMZ4tlNTGxsXYOfSZgRr7Kc8Rw/nj8fR131tmSITUOENmCzhZ6F88voboLOlHz4eTf0cS/1yv9NDa7X2QWVluJR4hwiG+C0ND2WyjeLd7sAnDWGRwDPy2Ukw0QKO8//ZvIlwjlfqZPKWYNZYwLdll5DsoioPwChJpOCHN6rntK57kTDUr9LyCqTllztfH/i/YJR98TMOm4KL+c3ro9n6UmhWDasT8R3W7GeA==">>}
+    , {<<"accessType">>, <<"0">>}
+    , {<<"bizType">>, <<"000501">>}
+    , {<<"certId">>, <<"68759585097">>}
+    , {<<"currencyCode">>, <<"156">>}
+    , {<<"encoding">>, <<"UTF-8">>}
+    , {<<"merId">>, <<"777290058110097">>}
+    , {<<"orderId">>, <<"20171115104441561205906">>}
+    , {<<"payCardType">>, <<"01">>}
+    , {<<"queryId">>, <<"201711151044411659858">>}
+    , {<<"respCode">>, <<"00">>}
+    , {<<"respMsg">>, <<"Success!">>}
+    , {<<"settleAmt">>, <<"50">>}
+    , {<<"settleCurrencyCode">>, <<"156">>}
+    , {<<"settleDate">>, <<"1115">>}
+    , {<<"signMethod">>, <<"01">>}
+    , {<<"traceNo">>, <<"165985">>}
+    , {<<"traceTime">>, <<"1115104441">>}
+    , {<<"txnAmt">>, <<"50">>}
+    , {<<"txnSubType">>, <<"00">>}
+    , {<<"txnTime">>, <<"20171115104441">>}
+    , {<<"txnType">>, <<"11">>}
+    , {<<"version">>, <<"5.0.0">>}
+    , {<<"signature">>, <<"SB7flyvLufIjuYHus4wb1+BqMuKoEsEYph3qGRvpjqQku5rT5o//T/hbC2j59gPA+wlZx/rti24M1A7WW1RnuH9DGk70VxTguOF07F7PFxKlflYa93zBKvY2hGvyizHlpqYMmYwoFng9PxGhlj8Cdv8spziax4pfYzVmV+V4NN90zDEqJv8eQfqUtOsCSEJCf4GJKvj8SIvFaO+QRcrlPh2RFKUVFhdmAPMMNE/9v4wJ6UNoUT8/04htkc8MjRE0HOJu5AqFIfsAEVke1aUc5IuEjcPTdUXespkExJfHPsC2SbTJp2QysHGNsWVBgnKAYw9/tmFfNPMC9o87MP9qQA==">>}
   ].
+
 
 pk(collect) ->
   {<<"00001">>, <<"20171021">>, <<"20171021095817473460847">>};
@@ -500,5 +571,57 @@ batch_collect_test_1() ->
   ?assertEqual(<<"000012017111120171111155907130382068155907130000测试交易http://localhost:8888/pg/simu_mcht_back_succ_info39eJx9kM1KAzEQx++FvkqZ/2STTY7iyUtPPXjVbcQeurukK1iZF5BCT3oqQg++gCeliE/Tj9dwtkrxA00CEzK/mV8Y26MeCQzpEiPS7VRpGNPJUIqrlGJZTI+rYZTmujwaN3JWFINpHdvYr5SYNNU4pv5Yzkc3+0QRUzO6GNSfF21TX1ZlVLiuJs2kSKO66XbIcyvcS43JIbBOPr5AEMdgdmBiIs4pU042r8v1y60oYZXQYwyBgZArAw45TgXekbOOtEK2y+f122zzdL97XP3w+Zz3PvvLp3mwDYaNbB/mm8Xiu8+wVV8AOLOA06Fl3uXInHP/+8yfPn33IYOX3Xy2Xt198QGkGyFQGzO0QzK+bQEof/C9A0jokSU=eeee"/utf8>>,
     pg_mcht_protocol:sign_string(M, PMchtReq)),
 
+
+  ok.
+%%--------------------------------------------------------------------
+echo_server_test_1() ->
+  {StatusCode, Header, Body} = xfutils:post("http://localhost:9999/esi/pg_txn_echo_server:echo", <<"a=b&c=d">>),
+  ?assertEqual(200, StatusCode),
+  ?assertEqual("a=b&c=d", Body),
+  ok.
+%%--------------------------------------------------------------------
+info_collect_test_1() ->
+  db_init(),
+
+  MRepoUp = pg_txn:repo_module(up_txn_log),
+  ok = pg_repo:save(MRepoUp,
+    pg_model:new(MRepoUp,
+      [
+        {mcht_index_key, {a, b, c}}
+        , {up_index_key, {<<"777290058110097">>, <<"20171115104441">>, <<"20171115104441561205906">>}}
+        , {up_orderId, <<"20171115104441561205906">>}
+      ])),
+
+  MRepoMcht = pg_txn:repo_module(mcht_txn_log),
+  ok = pg_repo:save(MRepoMcht,
+    pg_model:new(MRepoMcht,
+      [
+        {mcht_index_key, {a, b, c}}
+        , {back_url, <<"http://localhost:9999/esi/pg_txn_echo_server:echo">>}
+        , {txn_amt, <<"50">>}
+        , {order_desc, <<"测试交易"/utf8>>}
+        , {mcht_id, <<"00001">>}
+        , {txn_seq, <<"20171021095817473460847">>}
+        , {bank_card_no, <<"6216261000000000018">>}
+        , {txn_date, <<"20171021">>}
+        , {txn_time, <<"095817">>}
+        , {id_type, <<"01">>}
+        , {id_no, <<"341126197709218366">>}
+        , {id_name, <<"全渠道"/utf8>>}
+        , {mobile, <<"13552535506">>}
+      ])),
+
+  TxnType = up_txn_info_collect,
+  PV = qs(up_info_collect),
+
+  {RepoUp, RepoMcht} = stage_action(TxnType, stage_handle_up_info, PV),
+  ?assertEqual([{a, b, c}, <<"20171115104441561205906">>],
+    pg_model:get(MRepoMcht, RepoMcht, [mcht_index_key, query_id])),
+
+  stage_action(TxnType, stage_return_mcht_info, {RepoUp, RepoMcht}),
+
+
+  %%-------------------------------
+  pg_txn:handle(up_txn_info_collect, PV),
 
   ok.
