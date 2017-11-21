@@ -140,6 +140,7 @@ env_init() ->
                   {stage_send_up_req,
                     [
                       {model_in, pg_up_protocol_req_collect}
+                      , {post_url, up_back_url}
                     ]
                   }
                 },
@@ -193,6 +194,7 @@ env_init() ->
                   {stage_send_up_req,
                     [
                       {model_in, pg_up_protocol_req_batch_collect}
+                      , {post_url, up_back_url}
                     ]
                   }
                 },
@@ -236,8 +238,51 @@ env_init() ->
                 {stage,
                   {stage_return_mcht_info,
                     [
-                      {model_in, pg_txn_t_repo_up_txn_log_pt}
-                      , {model_out, pg_mcht_protocol_info_collect}
+                      {model_out, pg_mcht_protocol_info_collect}
+
+                    ]
+                  }}
+
+              ]
+            },
+            {resp_mode, body},
+            {resp_protocol_model, pg_mcht_protocol_resp_batch_collect},
+            {fail_template, x},
+            {succ_template, x}
+          ]
+
+        },
+        {up_txn_query,
+          [
+            {stages,
+              [
+                {stage,
+                  {stage_gen_up_query,
+                    [
+                      {model_out, pg_up_protocol_req_query}
+                    ]
+                  }
+                },
+                {stage,
+                  {stage_send_up_req,
+                    [
+                      {model_in, pg_up_protocol_req_query}
+                      , {post_url, up_query_url}
+                    ]
+                  }
+                },
+                {stage,
+                  {stage_handle_up_resp_query,
+                    [
+                      {model_in, pg_up_protocol_resp_query}
+                      , {model_out, pg_mcht_protocol_resp_batch_collect}
+                    ]
+                  }
+                },
+                {stage,
+                  {stage_return_mcht_info,
+                    [
+                      {model_out, pg_mcht_protocol_info_collect}
 
                     ]
                   }}
@@ -327,7 +372,7 @@ qs(collect) ->
     , {<<"certifId">>, <<"341126197709218366">>}
     , {<<"certifName">>, <<"全渠道"/utf8>>}
     , {<<"phoneNo">>, <<"13552535506">>}
-    , {<<"trustBackUrl">>, <<"http://localhost:8888/pg/simu_mcht_back_succ_info">>}
+    , {<<"trustBackUrl">>, <<"http://localhost:9999/esi/pg_txn_echo_server:echo">>}
   ];
 qs(batch_collect) ->
   [
@@ -448,13 +493,16 @@ mcht_txn_req_collect_test_1() ->
       [mcht_index_key, txn_type, bank_card_no, id_type, id_no, id_name, mobile])),
 
   %% stage 2,gen_up_req
-  {PUpReq, RepoUp} = stage_action(TxnType, stage_gen_up_req, {PMchtReq, RepoMcht}),
-  ?assertEqual([pk(collect), <<"6216261000000000018">>, <<"341126197709218366">>, <<"全渠道"/utf8>>, <<"13552535506">>],
-    pg_model:get(pg_txn_t_repo_up_txn_log_pt, RepoUp, [mcht_index_key, up_accNo, up_idNo, up_idName, up_mobile])),
-  ?debugFmt("PUpReq = ~p~nRepoUp = ~p", [PUpReq, RepoUp]),
+%%  {PUpReq, RepoUp} = stage_action(TxnType, stage_gen_up_req, {PMchtReq, RepoMcht}),
+%%  ?assertEqual([pk(collect), <<"6216261000000000018">>, <<"341126197709218366">>, <<"全渠道"/utf8>>, <<"13552535506">>],
+%%    pg_model:get(pg_txn_t_repo_up_txn_log_pt, RepoUp, [mcht_index_key, up_accNo, up_idNo, up_idName, up_mobile])),
+%%  ?debugFmt("PUpReq = ~p~nRepoUp = ~p", [PUpReq, RepoUp]),
+  PUpReq = stage_action(TxnType, stage_gen_up_req, {PMchtReq, RepoMcht}),
+  ?debugFmt("PUpReq = ~p", [PUpReq]),
 
   %% stage 3,send_up_req
-  {Status, Headers, Body} = stage_action(TxnType, stage_send_up_req, {PUpReq, RepoUp}),
+%%  {Status, Headers, Body} = stage_action(TxnType, stage_send_up_req, {PUpReq, RepoUp}),
+  {Status, Headers, Body} = stage_action(TxnType, stage_send_up_req, PUpReq),
   ?assertEqual({"HTTP/1.1", 200, "OK"}, Status),
   ?assertEqual("UPJAS", proplists:get_value("server", Headers)),
   ?assertEqual(<<"UTF-8">>, proplists:get_value(<<"encoding">>, xfutils:parse_post_body(Body))),
@@ -485,6 +533,32 @@ mcht_txn_req_collect_test_1() ->
   ?assertThrow({validate_req_model_stop, <<"12">>, _, {model, _, _}},
     stage_action(mcht_txn_req_collect, stage_handle_mcht_req,
       proplists:delete(<<"signature">>, PV) ++ [{<<"signature">>, <<"AA">>}])),
+  %%-----------------------------------------------------------------------------------
+  %% query
+  %% stage 8, send query
+  TxnTypeQuery = up_txn_query,
+  UpIndexKey = pg_model:get(pg_txn:repo_module(up_txn_log), RepoUpNew, up_index_key),
+  UpReqQuery = stage_action(TxnTypeQuery, stage_gen_up_query, UpIndexKey),
+  ?debugFmt("UpIndexKey = ~p,UpReqQuery = ~ts", [UpIndexKey, pg_model:pr(pg_up_protocol_req_query, UpReqQuery)]),
+  ?assertEqual([UpIndexKey], pg_up_protocol:get(pg_up_protocol_req_query, UpReqQuery, [up_index_key])),
+
+  %% stage 3,send_up_req
+  {StatusQuery, HeaderQuery, BodyQuery} = stage_action(TxnTypeQuery, stage_send_up_req, UpReqQuery),
+  ?debugFmt("Query resp ==> Status = ~p,Header=~p,Body=~ts", [StatusQuery, HeaderQuery, BodyQuery]),
+  ?assertEqual({"HTTP/1.1", 200, "OK"}, StatusQuery),
+  ?assertEqual("UPJAS", proplists:get_value("server", HeaderQuery)),
+  ?assertEqual(<<"UTF-8">>, proplists:get_value(<<"encoding">>, xfutils:parse_post_body(BodyQuery))),
+
+  %% stage 9,handle_up_resp_query
+  {RepoUpQueryNew, RepoMchtQueryNew} = stage_action(TxnTypeQuery, stage_handle_up_resp_query, {StatusQuery, HeaderQuery, BodyQuery}),
+  ?assertEqual([<<"00">>, success], pg_model:get(pg_txn:repo_module(up_txn_log), RepoUpQueryNew, [up_respCode, txn_status])),
+  ?assertEqual([<<"00">>, success], pg_model:get(pg_txn:repo_module(mcht_txn_log), RepoMchtQueryNew, [resp_code, txn_status])),
+
+  %% stage 7,return_mcht_info
+  Return = stage_action(TxnTypeQuery, stage_return_mcht_info, {RepoUpQueryNew, RepoMchtQueryNew}),
+  ?assertEqual([], Return),
+
+
   ok.
 %%--------------------------------------------------------------------
 mcht_txn_req_collect_test_2() ->
@@ -494,6 +568,8 @@ mcht_txn_req_collect_test_2() ->
   db_init(),
 
   PV = req_collect_pv(),
+  ?debugFmt("=======================~n", []),
+  ?debugFmt("PV = ~p", [PV]),
   ResultBody = pg_txn:handle(TxnType, PV),
   MatchResult = binary:match(iolist_to_binary(ResultBody), <<"tranId=20171021095817473460847">>),
   ?assertNotEqual(nomatch, MatchResult),
@@ -528,7 +604,7 @@ fail_render_test_1() ->
   Result1 = pg_txn:handle(mcht_txn_req_collect, PVTxnAmtSmall),
   MatchResult1 = binary:match(iolist_to_binary(Result1), <<"respCode=33">>),
   ?assertNotEqual(nomatch, MatchResult1),
-  MatchResult11 = binary:match(iolist_to_binary(Result1), <<"respMsg=交易金额太小"/utf8>>),
+  MatchResult11 = binary:match(iolist_to_binary(Result1), <<"respMsg=交易金额超限"/utf8>>),
   ?assertNotEqual(nomatch, MatchResult11),
   ok.
 

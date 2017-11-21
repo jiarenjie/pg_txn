@@ -22,6 +22,8 @@
   , stage_return_mcht_resp/2
   , stage_handle_up_info/2
   , stage_return_mcht_info/2
+  , stage_gen_up_query/2
+  , stage_handle_up_resp_query/2
 ]).
 -define(APP, ?MODULE).
 %%-------------------------------------------------------------------
@@ -81,17 +83,21 @@ stage_gen_up_req({PMchtReq, RepoMchtTxnLog}, Options)
   ok = pg_repo:save(RepoUpReq),
 
 
-  {PUpReqWithSig, RepoUpReq}.
+%%  {PUpReqWithSig, RepoUpReq}.
+  PUpReqWithSig.
 %%-----------------------------------------------------------------
 %% stage 3
-stage_send_up_req({PUpReq, RepoUpReq}, Options)
-  when is_tuple(PUpReq), is_tuple(RepoUpReq), is_list(Options) ->
+%%stage_send_up_req({PUpReq, _RepoUpReq}, Options)
+%%  when is_tuple(PUpReq), is_tuple(_RepoUpReq), is_list(Options) ->
+stage_send_up_req(PUpReq, Options)
+  when is_tuple(PUpReq), is_list(Options) ->
   %% convert PUpReq to post
   MIn = proplists:get_value(model_in, Options),
   PostBody = pg_up_protocol:in_2_out(MIn, PUpReq, post),
 
   %% send to unionpay
-  PostUrl = up_config:get_config(up_back_url),
+  UpUrlCfg = proplists:get_value(post_url, Options),
+  PostUrl = up_config:get_config(UpUrlCfg),
   ?debugFmt("===========================================", []),
   ?debugFmt("PostBody = ~ts~nPostUrl = ~p", [PostBody, PostUrl]),
   lager:debug("PostBody = ~ts~nPostUrl = ~p", [PostBody, PostUrl]),
@@ -258,8 +264,8 @@ stage_return_mcht_info({RepoUp, RepoMcht}, Options) ->
   ?debugFmt("PMchtInfo = ~p", [PMchtInfo]),
 
   {SignString, Sig} = pg_mcht_protocol:sign(MOut, PMchtInfo),
-  lager:debug("Return mcht resp ,signstring = ~ts,sig=~p", [SignString, Sig]),
-  ?debugFmt("Return mcht resp ,signstring = ~ts,sig=~p", [SignString, Sig]),
+  lager:debug("Return mcht info ,signstring = ~ts,sig=~p", [SignString, Sig]),
+  ?debugFmt("Return mcht info ,signstring = ~ts,sig=~p", [SignString, Sig]),
 
 
   PMchtInfoWithSig = pg_model:set(MOut, PMchtInfo, signature, Sig),
@@ -292,6 +298,62 @@ stage_return_mcht_info({RepoUp, RepoMcht}, Options) ->
 
   [].
 
+%%-----------------------------------------------------------------
+%% stage 8
+stage_gen_up_query(UpIndexKey, Options) when is_list(Options), is_tuple(UpIndexKey) ->
+  MRepoUp = pg_txn:repo_module(up_txn_log),
+  MOut = proplists:get_value(model_out, Options),
+  {ok, [RepoUp]} = pg_repo:fetch_index(MRepoUp, {up_index_key, UpIndexKey}),
+  PUQuery = pg_convert:convert(MOut, RepoUp),
+  PUQueryWithSig = up_sign(MOut, PUQuery),
+
+  PUQueryWithSig.
+
+%%-----------------------------------------------------------------
+%% stage 9 , handle_up_resp_query
+stage_handle_up_resp_query({Status, Headers, Body}, Options) when is_binary(Body) ->
+  ?debugFmt("Enter stage_handle_up_resp_query ====================", []),
+  PV = xfutils:parse_post_body(Body),
+  MIn = proplists:get_value(model_in, Options),
+  PUpResp = pg_protocol:out_2_in(MIn, PV),
+  ?debugFmt("PUpResp = ~ts", [pg_model:pr(MIn, PUpResp)]),
+
+  %% if resp_query's respCode != 00
+  %% exit directly
+  %% otherwise , update up_txn_log/mcht_txn_log according to origRespCode/origRespMsg
+
+  RespCode = pg_model:get(MIn, PUpResp, respCode),
+  case RespCode of
+    <<"00">> ->
+      ok;
+    _ ->
+      lager:error("UpQuery return's not success! respCode = ~p,UpRespQuery = ~ts",
+        [RespCode, pg_model:pr(MIn, PUpResp)]),
+      throw({up_resp_return_fail})
+  end,
+
+  %% respCode is <<"00">>
+  [UpIndexKey, UpRespCd, UpRespMsg, UpQueryId, OrigRespCode, OrigRespMsg] =
+    pg_up_protocol:get(MIn, PUpResp, [up_index_key, respCode, respMsg, queryId, origRespCode, origRespMsg]),
+
+  ?debugFmt("UpIndexKey = ~p,UpRespCd = ~p,UpRespMsg = ~ts",
+    [UpIndexKey, UpRespCd, pg_model:pr(MIn, PUpResp)]),
+
+  %% update up_txn_log
+  MRepoUp = pg_txn:repo_module(up_txn_log),
+  VL = pg_convert:convert(MIn, PUpResp),
+  {ok, RepoUpNew} = pg_repo:update(MRepoUp, VL),
+  ?debugFmt("VL = ~p~nRepoUpNew = ~p", [VL, RepoUpNew]),
+
+  %% update_mcht_txn_log
+  MRepoMcht = pg_txn:repo_module(mcht_txn_log),
+  MOut = proplists:get_value(model_out, Options),
+  VL1 = pg_convert:convert(MOut, RepoUpNew),
+  {ok, RepoMchtNew} = pg_repo:update(MRepoMcht, VL1),
+  ?debugFmt("VL = ~p~nRepoMchtNew = ~p", [VL1, RepoMchtNew]),
+
+  ?debugFmt("MRepoUp = ~ts~nMRepoMcht = ~ts", [pg_model:pr(MRepoUp, RepoUpNew), pg_model:pr(MRepoMcht, RepoMchtNew)]),
+  {RepoUpNew, RepoMchtNew}.
 %%-----------------------------------------------------------------
 repo_module(mchants = TableName) ->
   {ok, Module} = application:get_env(?APP, mcht_repo_name),
@@ -398,4 +460,11 @@ do_render_fail_result(body, MTxn, TxnConfig, RespCd, RespMsg, {model, MIn, Proto
   pg_model:to(MTo, RespProtocolWithSig, {poststring, PostFields, In2OutMap}).
 
 
+%%-------------------------------------------------------------
+up_sign(M, P) when is_atom(M), is_tuple(P) ->
+  Sig = pg_up_protocol:sign(M, P),
+  pg_model:set(M, P, signature, Sig).
 
+mcht_sign(M, P) when is_atom(M), is_tuple(P) ->
+  Sig = pg_mcht_protocol:sign(M, P),
+  pg_model:set(M, P, signature, Sig).
