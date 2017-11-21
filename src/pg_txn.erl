@@ -116,7 +116,7 @@ stage_send_up_req(PUpReq, Options)
     _:X ->
       ?LARGER_STACKTRACE_1(X),
       lager:error("send up req to unionpay error,PostBody = ~ts", [PostBody]),
-      throw({send_up_req_stop, <<"99">>, <<"上游通道接受错误">>, {model, MIn, PUpReq}})
+      throw({send_up_req_stop, <<"99">>, <<"上游通道接受错误"/utf8>>, {model, MIn, PUpReq}})
   end.
 
 %%-----------------------------------------------------------------
@@ -295,7 +295,7 @@ stage_return_mcht_info({RepoUp, RepoMcht}, Options) ->
     _:X ->
       ?LARGER_STACKTRACE_1(X),
       lager:error("send up req to unionpay error,InfoBody = ~ts", [InfoBody]),
-      throw({send_up_req_stop, <<"99">>, <<"上游通道接受错误">>, {model, MOut, PMchtInfoWithSig}})
+      throw({send_up_req_stop, <<"99">>, <<"上游通道接受错误"/utf8>>, {model, MOut, PMchtInfoWithSig}})
   end,
 
 
