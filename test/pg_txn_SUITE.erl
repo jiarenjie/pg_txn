@@ -17,7 +17,9 @@
 -define(APP, pg_txn).
 
 setup() ->
+  lager_init(),
   lager:start(),
+%%  lager:set_loglevel(lager_console_backend, debug),
   pg_test_utils:setup(mnesia),
   application:start(pg_mcht_enc),
   application:start(pg_mcht_protocol),
@@ -44,6 +46,24 @@ setup() ->
   ok.
 
 
+%%------------------------------------------------------------
+lager_init() ->
+  LagerHandlerCfg = [
+    {lager_console_backend, [{level, debug}, {formatter, lager_default_formatter},
+      {formatter_config, [
+        date, " ", time
+        , " [", severity, "]"
+        , {module, [
+          module,
+          {function, [":", function], ""},
+          {line, [":", line], ""}], ""},
+        {pid, ["@", pid], ""},
+        message
+        , "\n"
+
+      ]}]}
+  ],
+  application:set_env(lager, handlers, LagerHandlerCfg).
 %%------------------------------------------------------------
 db_init() ->
   RepoContents = [
@@ -337,22 +357,22 @@ my_test_() ->
     {
       inorder,
       [
-        fun mchants_test_1/0
-        , fun pg_txn:txn_options_test_1/0
-        , fun pg_txn:stage_options_test_1/0
-        , fun mcht_txn_req_collect_test_1/0
+        {timeout, 120, fun mchants_test_1/0}
+        , {timeout, 120, fun pg_txn:txn_options_test_1/0}
+        , {timeout, 120, fun pg_txn:stage_options_test_1/0}
+        , {timeout, 120, fun mcht_txn_req_collect_test_1/0}
 
-        , fun create_req_model_test_1/0
-        , fun mcht_txn_req_collect_test_2/0
+        , {timeout, 120, fun create_req_model_test_1/0}
+        , {timeout, 120, fun mcht_txn_req_collect_test_2/0}
 
-        , fun fail_render_test_1/0
+        , {timeout, 120, fun fail_render_test_1/0}
 
         %% batch collect
-        , fun batch_collect_test_1/0
+        , {timeout, 120, fun batch_collect_test_1/0}
 
-        , fun echo_server_test_1/0
+        , {timeout, 120, fun echo_server_test_1/0}
 
-        , fun info_collect_test_1/0
+        , {timeout, 120, fun info_collect_test_1/0}
 
       ]
     }
