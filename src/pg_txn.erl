@@ -133,12 +133,15 @@ stage_handle_up_resp({Status, Headers, Body}, Options) when is_binary(Body) ->
   %% update up_txn_log
   ?debugFmt("UpIndexKey = ~p,UpRespCd = ~p,UpRespMsg = ~p", [UpIndexKey, UpRespCd, UpRespMsg]),
   MRepoUp = pg_txn:repo_module(up_txn_log),
-  {ok, RepoUpNew} = pg_repo:update(MRepoUp, {up_index_key, UpIndexKey},
-    [{up_respCode, UpRespCd},
-      {up_respMsg, UpRespMsg},
-      {txn_status, xfutils:up_resp_code_2_txn_status(UpRespCd)},
-      {up_queryId, UpQueryId}
-    ]),
+%%  {ok, RepoUpNew} = pg_repo:update(MRepoUp, {up_index_key, UpIndexKey},
+%%    [{up_respCode, UpRespCd},
+%%      {up_respMsg, UpRespMsg},
+%%      {txn_status, xfutils:up_resp_code_2_txn_status(UpRespCd)},
+%%      {up_queryId, UpQueryId}
+%%    ]),
+
+  VLUp = pg_convert:convert(MIn, PUpResp),
+  {ok, RepoUpNew} = pg_repo:update(MRepoUp, VLUp),
 
   %% update_mcht_txn_log
   MRepoMcht = pg_txn:repo_module(mcht_txn_log),

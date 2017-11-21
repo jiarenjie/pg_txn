@@ -306,22 +306,22 @@ my_test_() ->
     {
       inorder,
       [
-        {timeout, 120, fun mchants_test_1/0}
-        , {timeout, 120, fun pg_txn:txn_options_test_1/0}
-        , {timeout, 120, fun pg_txn:stage_options_test_1/0}
-        , {timeout, 120, fun mcht_txn_req_collect_test_1/0}
+        {timeout, 240, fun mchants_test_1/0}
+        , {timeout, 240, fun pg_txn:txn_options_test_1/0}
+        , {timeout, 240, fun pg_txn:stage_options_test_1/0}
+        , {timeout, 240, fun mcht_txn_req_collect_test_1/0}
 
-        , {timeout, 120, fun create_req_model_test_1/0}
-        , {timeout, 120, fun mcht_txn_req_collect_test_2/0}
+        , {timeout, 240, fun create_req_model_test_1/0}
+        , {timeout, 240, fun mcht_txn_req_collect_test_2/0}
 
-        , {timeout, 120, fun fail_render_test_1/0}
+        , {timeout, 240, fun fail_render_test_1/0}
 
         %% batch collect
-        , {timeout, 120, fun batch_collect_test_1/0}
+        , {timeout, 240, fun batch_collect_test_1/0}
 
-        , {timeout, 120, fun echo_server_test_1/0}
+        , {timeout, 240, fun echo_server_test_1/0}
 
-        , {timeout, 120, fun info_collect_test_1/0}
+        , {timeout, 240, fun info_collect_test_1/0}
 
       ]
     }
