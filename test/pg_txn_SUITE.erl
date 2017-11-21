@@ -98,7 +98,7 @@ env_init() ->
       [
         {mchants_repo_name, pg_txn_t_repo_mchants_pt}
         , {up_repo_name, pg_txn_t_repo_up_txn_log_pt}
-        , {debug, true}
+%%        , {debug, true}
 
       ]
     },
@@ -471,13 +471,14 @@ mcht_txn_req_collect_test_1() ->
 
   %% stage 3,send_up_req
 %%  {Status, Headers, Body} = stage_action(TxnType, stage_send_up_req, {PUpReq, RepoUp}),
-  {Status, Headers, Body} = stage_action(TxnType, stage_send_up_req, PUpReq),
-  ?assertEqual({"HTTP/1.1", 200, "OK"}, Status),
+  {StatusCode, Headers, Body} = stage_action(TxnType, stage_send_up_req, PUpReq),
+%%  ?assertEqual({"HTTP/1.1", 200, "OK"}, Status),
+  ?assertEqual(200, StatusCode),
   ?assertEqual("UPJAS", proplists:get_value("server", Headers)),
   ?assertEqual(<<"UTF-8">>, proplists:get_value(<<"encoding">>, xfutils:parse_post_body(Body))),
 
   %% stage 4,handle_up_resp
-  {RepoUpNew, RepoMchtNew} = stage_action(TxnType, stage_handle_up_resp, {Status, Headers, Body}),
+  {RepoUpNew, RepoMchtNew} = stage_action(TxnType, stage_handle_up_resp, {StatusCode, Headers, Body}),
   ?debugFmt("RepoUpNew = ~ts~nRepoMchtNew = ~ts", [pg_model:pr(pg_txn:repo_module(up_txn_log), RepoUpNew),
     pg_model:pr(pg_txn:repo_module(mcht_txn_log), RepoMchtNew)]),
   ?assertEqual(50, pg_model:get(pg_txn:repo_module(up_txn_log), RepoUpNew, up_txnAmt)),
@@ -512,14 +513,15 @@ mcht_txn_req_collect_test_1() ->
   ?assertEqual([UpIndexKey], pg_up_protocol:get(pg_up_protocol_req_query, UpReqQuery, [up_index_key])),
 
   %% stage 3,send_up_req
-  {StatusQuery, HeaderQuery, BodyQuery} = stage_action(TxnTypeQuery, stage_send_up_req, UpReqQuery),
-  ?debugFmt("Query resp ==> Status = ~p,Header=~p,Body=~ts", [StatusQuery, HeaderQuery, BodyQuery]),
-  ?assertEqual({"HTTP/1.1", 200, "OK"}, StatusQuery),
+  {StatusCodeQuery, HeaderQuery, BodyQuery} = stage_action(TxnTypeQuery, stage_send_up_req, UpReqQuery),
+  ?debugFmt("Query resp ==> Status = ~p,Header=~p,Body=~ts", [StatusCodeQuery, HeaderQuery, BodyQuery]),
+%%  ?assertEqual({"HTTP/1.1", 200, "OK"}, StatusQuery),
+  ?assertEqual(200, StatusCodeQuery),
   ?assertEqual("UPJAS", proplists:get_value("server", HeaderQuery)),
   ?assertEqual(<<"UTF-8">>, proplists:get_value(<<"encoding">>, xfutils:parse_post_body(BodyQuery))),
 
   %% stage 9,handle_up_resp_query
-  {RepoUpQueryNew, RepoMchtQueryNew} = stage_action(TxnTypeQuery, stage_handle_up_resp_query, {StatusQuery, HeaderQuery, BodyQuery}),
+  {RepoUpQueryNew, RepoMchtQueryNew} = stage_action(TxnTypeQuery, stage_handle_up_resp_query, {StatusCodeQuery, HeaderQuery, BodyQuery}),
   ?assertEqual([<<"00">>, success], pg_model:get(pg_txn:repo_module(up_txn_log), RepoUpQueryNew, [up_respCode, txn_status])),
   ?assertEqual([<<"00">>, success], pg_model:get(pg_txn:repo_module(mcht_txn_log), RepoMchtQueryNew, [resp_code, txn_status])),
 

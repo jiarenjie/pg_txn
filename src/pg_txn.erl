@@ -60,27 +60,27 @@ stage_handle_mcht_req(PV, Options) when is_list(PV), is_list(Options) ->
 %% stage 2
 stage_gen_up_req({PMchtReq, RepoMchtTxnLog}, Options)
   when is_tuple(PMchtReq), is_tuple(RepoMchtTxnLog), is_list(Options) ->
-  ?debugFmt("======================================================~n", []),
-  ?debugFmt("Options = ~p", [Options]),
-
 
   %% convert to up req
   MOut = proplists:get_value(model_out, Options),
-  ?debugFmt("Mout = ~p,PMchtReq = ~p", [MOut, PMchtReq]),
+  lager:debug("Mout = ~p,PMchtReq = ~p", [MOut, PMchtReq]),
   PUpReq = pg_convert:convert(MOut, PMchtReq),
-  ?debugFmt("PUpReq = ~p", [PUpReq]),
+  lager:debug("PUpReq = ~p", [PUpReq]),
 
   %% sign
-  Sig = pg_up_protocol:sign(MOut, PUpReq),
-  PUpReqWithSig = pg_model:set(MOut, PUpReq, signature, Sig),
-  ?debugFmt("PUpReqWithSig = ~p", [PUpReqWithSig]),
+%%  Sig = pg_up_protocol:sign(MOut, PUpReq),
+  PUpReqWithSig = up_sign(MOut, PUpReq),
+%%    pg_model:set(MOut, PUpReq, signature, Sig),
+
+  lager:debug("PUpReqWithSig = ~p", [PUpReqWithSig]),
 
   %% convert to up_txn_log
-  RepoUpReq = pg_convert:convert(MOut, PUpReq, save_req),
-  ?debugFmt("RepoUpReq = ~p", [RepoUpReq]),
-
   %% save up_txn_log
-  ok = pg_repo:save(RepoUpReq),
+  ok = save_up_req(MOut, PUpReq),
+%%  RepoUpReq = pg_convert:convert(MOut, PUpReq, save_req),
+%%  ?debugFmt("RepoUpReq = ~p", [RepoUpReq]),
+
+%%  ok = pg_repo:save(RepoUpReq),
 
 
 %%  {PUpReqWithSig, RepoUpReq}.
@@ -98,62 +98,46 @@ stage_send_up_req(PUpReq, Options)
   %% send to unionpay
   UpUrlCfg = proplists:get_value(post_url, Options),
   PostUrl = up_config:get_config(UpUrlCfg),
-  ?debugFmt("===========================================", []),
-  ?debugFmt("PostBody = ~ts~nPostUrl = ~p", [PostBody, PostUrl]),
   lager:debug("PostBody = ~ts~nPostUrl = ~p", [PostBody, PostUrl]),
 
   %% receive response
   try
-    {ok, {Status, Headers, Body}} = httpc:request(post,
-      {binary_to_list(PostUrl), [], "application/x-www-form-urlencoded", iolist_to_binary(PostBody)}, %% Request
-      [],                 %% HTTPOptions
-      [{body_format, binary}]                %% Options
-    ),
-    ?debugFmt("http Statue = ~p~nHeaders  = ~p~nBody=~ts~n", [Status, Headers, Body]),
-    lager:debug("http Statue = ~p~nHeaders  = ~p~nBody=~ts~n", [Status, Headers, Body]),
-    {Status, Headers, Body}
+    {200, Header, Body} = do_post(PostUrl, PostBody),
+    {200, Header, Body}
   catch
     _:X ->
       ?LARGER_STACKTRACE_1(X),
-      lager:error("send up req to unionpay error,PostBody = ~ts", [PostBody]),
+      lager:error("send up req to unionpay url ~p error,PostBody = ~ts", [PostUrl, PostBody]),
       throw({send_up_req_stop, <<"99">>, <<"上游通道接受错误"/utf8>>, {model, MIn, PUpReq}})
   end.
 
 %%-----------------------------------------------------------------
 %% stage 4
 stage_handle_up_resp({Status, Headers, Body}, Options) when is_binary(Body) ->
-  ?debugFmt("Enter stage_handle_up_resp ====================", []),
   PV = xfutils:parse_post_body(Body),
   MIn = proplists:get_value(model_in, Options),
   PUpResp = pg_protocol:out_2_in(MIn, PV),
-  ?debugFmt("PUpResp = ~p", [PUpResp]),
-  [UpIndexKey, UpRespCd, UpRespMsg, UpQueryId] = pg_up_protocol:get(MIn, PUpResp,
-    [up_index_key, respCode, respMsg, queryId]),
+  lager:debug("PUpResp = ~ts", [pg_model:pr(MIn, PUpResp)]),
 
   %% update up_txn_log
-  ?debugFmt("UpIndexKey = ~p,UpRespCd = ~p,UpRespMsg = ~p", [UpIndexKey, UpRespCd, UpRespMsg]),
   MRepoUp = pg_txn:repo_module(up_txn_log),
-%%  {ok, RepoUpNew} = pg_repo:update(MRepoUp, {up_index_key, UpIndexKey},
-%%    [{up_respCode, UpRespCd},
-%%      {up_respMsg, UpRespMsg},
-%%      {txn_status, xfutils:up_resp_code_2_txn_status(UpRespCd)},
-%%      {up_queryId, UpQueryId}
-%%    ]),
+  RepoUpNew = update_txn_log(MIn, {MIn, PUpResp}, MRepoUp),
 
-  VLUp = pg_convert:convert(MIn, PUpResp),
-  {ok, RepoUpNew} = pg_repo:update(MRepoUp, VLUp),
+%%  VLUp = pg_convert:convert(MIn, PUpResp),
+%%  {ok, RepoUpNew} = pg_repo:update(MRepoUp, VLUp),
 
   %% update_mcht_txn_log
-  MRepoMcht = pg_txn:repo_module(mcht_txn_log),
   MOut = proplists:get_value(model_out, Options),
-  VL = pg_convert:convert(MOut, RepoUpNew),
-  {ok, RepoMchtNew} = pg_repo:update(MRepoMcht, VL),
-  ?debugFmt("VL = ~p~nRepoMchtNew = ~p", [VL, RepoMchtNew]),
+  MRepoMcht = pg_txn:repo_module(mcht_txn_log),
+  RepoMchtNew = update_txn_log(MOut, {MRepoUp, RepoUpNew}, MRepoMcht),
+%%  VL = pg_convert:convert(MOut, RepoUpNew),
+%%  {ok, RepoMchtNew} = pg_repo:update(MRepoMcht, VL),
+%%  ?debugFmt("VL = ~p~nRepoMchtNew = ~p", [VL, RepoMchtNew]),
   %%  MchtIndexKey = pg_model:get(MRepoUp, RepoUpNew, mcht_index_key),
   %%  {ok, RepoMchtNew} = pg_repo:update_pk(MRepoMcht, MchtIndexKey,
   %%    [{resp_code, UpRespCd}, {resp_msg, UpRespMsg}, {txn_status, xfutils:up_resp_code_2_txn_status(UpRespCd)}]),
 
-  ?debugFmt("MRepoUp = ~ts~nMRepoMcht = ~ts", [pg_model:pr(MRepoUp, RepoUpNew), pg_model:pr(MRepoMcht, RepoMchtNew)]),
+%%  ?debugFmt("MRepoUp = ~ts~nMRepoMcht = ~ts", [pg_model:pr(MRepoUp, RepoUpNew), pg_model:pr(MRepoMcht, RepoMchtNew)]),
   {RepoUpNew, RepoMchtNew}.
 
 %%-----------------------------------------------------------------
@@ -471,3 +455,26 @@ up_sign(M, P) when is_atom(M), is_tuple(P) ->
 mcht_sign(M, P) when is_atom(M), is_tuple(P) ->
   Sig = pg_mcht_protocol:sign(M, P),
   pg_model:set(M, P, signature, Sig).
+%%-----------------------------------------------------------------
+save_up_req(M, P) when is_atom(M), is_tuple(P) ->
+  Repo = pg_convert:convert(M, P, save_req),
+  lager:debug("Repo = ~ts", [pg_model:pr(pg_txn:repo_module(up_txn_log), Repo)]),
+  ok = pg_repo:save(Repo).
+%%-----------------------------------------------------------------
+do_post(PostUrl, PostBody) when is_binary(PostUrl) ->
+
+  {ok, {{_, StatusCode, _}, Headers, Body}} = httpc:request(post,
+    {binary_to_list(PostUrl), [], "application/x-www-form-urlencoded", iolist_to_binary(PostBody)}, %% Request
+    [],                 %% HTTPOptions
+    [{body_format, binary}]                %% Options
+  ),
+  lager:debug("http StatusCode = ~p~nHeaders  = ~p~nBody=~ts~n", [StatusCode, Headers, Body]),
+  {StatusCode, Headers, Body}.
+%%-----------------------------------------------------------------
+update_txn_log(MFrom, {MP, P}, MRepo) when is_atom(MFrom), is_atom(MP), is_tuple(P), is_atom(MRepo) ->
+  VL = pg_convert:convert(MFrom, P),
+  {ok, RepoNew} = pg_repo:update(MRepo, VL),
+  lager:debug("After update_txn_log,MP=~p,P=~ts",
+    [MFrom, pg_model:pr(MP, P)]),
+  lager:debug("MRepo=~p,RepoNew=~ts", [MRepo, pg_model:pr(MRepo, RepoNew)]),
+  RepoNew.
