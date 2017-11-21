@@ -38,6 +38,7 @@
                   {stage_send_up_req,
                     [
                       {model_in, pg_up_protocol_req_collect}
+                      , {post_url, up_back_url}
                     ]
                   }
                 },
@@ -73,7 +74,7 @@
                   {stage_handle_mcht_req,
                     [
                       {model_in, pg_mcht_protocol_req_batch_collect}
-                      , {model_repo, pg_txn_t_repo_mcht_txn_log_pt}
+                      , {model_repo, repo_mcht_txn_log_pt}
                     ]
                   }
                 },
@@ -90,6 +91,7 @@
                   {stage_send_up_req,
                     [
                       {model_in, pg_up_protocol_req_batch_collect}
+                      , {post_url, up_back_url}
                     ]
                   }
                 },
@@ -143,6 +145,50 @@
             },
             {resp_mode, body},
             {resp_protocol_model, pg_mcht_protocol_info_collect},
+            {fail_template, x},
+            {succ_template, x}
+          ]
+
+        },
+        {up_txn_query,
+          [
+            {stages,
+              [
+                {stage,
+                  {stage_gen_up_query,
+                    [
+                      {model_out, pg_up_protocol_req_query}
+                    ]
+                  }
+                },
+                {stage,
+                  {stage_send_up_req,
+                    [
+                      {model_in, pg_up_protocol_req_query}
+                      , {post_url, up_query_url}
+                    ]
+                  }
+                },
+                {stage,
+                  {stage_handle_up_resp_query,
+                    [
+                      {model_in, pg_up_protocol_resp_query}
+                      , {model_out, pg_mcht_protocol_resp_batch_collect}
+                    ]
+                  }
+                },
+                {stage,
+                  {stage_return_mcht_info,
+                    [
+                      {model_out, pg_mcht_protocol_info_collect}
+
+                    ]
+                  }}
+
+              ]
+            },
+            {resp_mode, body},
+            {resp_protocol_model, pg_mcht_protocol_resp_batch_collect},
             {fail_template, x},
             {succ_template, x}
           ]

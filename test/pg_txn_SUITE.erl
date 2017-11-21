@@ -17,9 +17,8 @@
 -define(APP, pg_txn).
 
 setup() ->
-  lager_init(),
-  lager:start(),
-%%  lager:set_loglevel(lager_console_backend, debug),
+  pg_test_utils:lager_init(),
+
   pg_test_utils:setup(mnesia),
   application:start(pg_mcht_enc),
   application:start(pg_mcht_protocol),
@@ -27,14 +26,7 @@ setup() ->
   application:start(pg_convert),
   application:start(up_config),
   application:start(inets),
-  inets:start(httpd, [
-    {module, [mod_esi]},
-    {port, 9999},
-    {server_name, "localhost"},
-    {document_root, "."},
-    {server_root, "."},
-    {erl_script_alias, {"/esi", [pg_txn_echo_server]}}
-  ]),
+  pg_test_utils:http_echo_server_init(),
 
   pg_repo:drop(?M_Repo),
   pg_repo:init(?M_Repo),
@@ -46,24 +38,6 @@ setup() ->
   ok.
 
 
-%%------------------------------------------------------------
-lager_init() ->
-  LagerHandlerCfg = [
-    {lager_console_backend, [{level, debug}, {formatter, lager_default_formatter},
-      {formatter_config, [
-        date, " ", time
-        , " [", severity, "]"
-        , {module, [
-          module,
-          {function, [":", function], ""},
-          {line, [":", line], ""}], ""},
-        {pid, ["@", pid], ""},
-        message
-        , "\n"
-
-      ]}]}
-  ],
-  application:set_env(lager, handlers, LagerHandlerCfg).
 %%------------------------------------------------------------
 db_init() ->
   RepoContents = [
@@ -318,32 +292,7 @@ env_init() ->
         }
 
       ]
-    },
-    {lager,
-      [
-        {log_root, "/tmp/logs/"},
-        {handlers,
-          [
-            {lager_console_backend,
-              [debug,
-                {lager_default_formatter,
-                  [date, " ", time
-                    , " [", severity, "]"
-                    , {module, [
-                    module,
-                    {function, [":", function], ""},
-                    {line, [":", line], ""}], ""},
-                    {pid, ["@", pid], ""},
-                    message
-                    , "\n"
-                  ]
-                }
-              ]
-            },
-            {lager_file_backend, [{file, "error.log"}, {level, error}, {date, "$D23"}, {count, 60}]},
-            {lager_file_backend, [{file, "console.log"}, {level, debug}, {date, "$D23"}, {count, 60}]}
-          ]}
-      ]}
+    }
   ],
 
   pg_test_utils:env_init(Cfgs).
@@ -392,7 +341,7 @@ qs(collect) ->
     , {<<"certifId">>, <<"341126197709218366">>}
     , {<<"certifName">>, <<"全渠道"/utf8>>}
     , {<<"phoneNo">>, <<"13552535506">>}
-    , {<<"trustBackUrl">>, <<"http://localhost:9999/esi/pg_txn_echo_server:echo">>}
+    , {<<"trustBackUrl">>, <<"http://localhost:9999/esi/pg_test_utils_echo_server:echo">>}
   ];
 qs(batch_collect) ->
   [
@@ -671,7 +620,7 @@ batch_collect_test_1() ->
   ok.
 %%--------------------------------------------------------------------
 echo_server_test_1() ->
-  {StatusCode, Header, Body} = xfutils:post("http://localhost:9999/esi/pg_txn_echo_server:echo", <<"a=b&c=d">>),
+  {StatusCode, Header, Body} = xfutils:post("http://localhost:9999/esi/pg_test_utils_echo_server:echo", <<"a=b&c=d">>),
   ?assertEqual(200, StatusCode),
   ?assertEqual("a=b&c=d", Body),
   ok.
@@ -693,7 +642,7 @@ info_collect_test_1() ->
     pg_model:new(MRepoMcht,
       [
         {mcht_index_key, {a, b, c}}
-        , {back_url, <<"http://localhost:9999/esi/pg_txn_echo_server:echo">>}
+        , {back_url, <<"http://localhost:9999/esi/pg_test_utils_echo_server:echo">>}
         , {txn_amt, <<"50">>}
         , {order_desc, <<"测试交易"/utf8>>}
         , {mcht_id, <<"00001">>}
