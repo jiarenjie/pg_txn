@@ -11,6 +11,7 @@
   , repo_module/1
   , txn_options/1
   , stage_options/2
+  , mcht_sign/2
 ]).
 
 -export([
@@ -24,6 +25,7 @@
   , stage_return_mcht_info/2
   , stage_gen_up_query/2
   , stage_handle_up_resp_query/2
+  , stage_handle_mcht_req_query/2
 ]).
 -define(APP, ?MODULE).
 %%-------------------------------------------------------------------
@@ -232,6 +234,29 @@ stage_handle_up_resp_query({_Status, _Headers, Body}, Options) when is_binary(Bo
 
   {RepoUpNew, RepoMchtNew}.
 %%-----------------------------------------------------------------
+%% stage 10, handle_mcht_req_query
+stage_handle_mcht_req_query(PV, Options) when is_list(PV), is_list(Options) ->
+  %% validate wire format
+  pg_txn_stage_handler:validate_format(PV),
+
+  %% create model
+  MIn = proplists:get_value(model_in, Options),
+
+  PMchtReqQuery = pg_txn_stage_handler:create_req_model(MIn, PV),
+
+  %% validate mcht req model
+  pg_txn_stage_handler:validate_biz(MIn, PMchtReqQuery),
+
+  %% orig txn exists,otherwise exception should be throw
+  %% fetch orig
+  MRepoMcht = pg_txn:repo_module(mcht_txn_log),
+  OrigMchtIndexKey = pg_mcht_protocol:get(MIn, PMchtReqQuery, mcht_index_key),
+  {ok, [OrigMchtTxn]} = pg_repo:fetch(MRepoMcht, OrigMchtIndexKey),
+
+  OrigMchtTxn.
+
+
+%%-----------------------------------------------------------------
 repo_module(mchants = TableName) ->
   {ok, Module} = application:get_env(?APP, mcht_repo_name),
   TableName = pg_model:name(Module),
@@ -269,7 +294,7 @@ stage_options(MTxn, Stage) ->
   StageOptions.
 
 stage_options_test_1() ->
-  ?assertEqual([{model_in, pg_mcht_protocol_req_collect}, {model_repo, pg_txn_t_repo_mcht_txn_log_pt}],
+  ?assertEqual([{model_in, pg_mcht_protocol_req_collect}],
     stage_options(mcht_txn_req_collect, stage_handle_mcht_req)),
   ok.
 

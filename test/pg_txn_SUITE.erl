@@ -117,7 +117,6 @@ env_init() ->
                   {stage_handle_mcht_req,
                     [
                       {model_in, pg_mcht_protocol_req_collect}
-                      , {model_repo, pg_txn_t_repo_mcht_txn_log_pt}
                     ]
                   }
                 },
@@ -157,9 +156,7 @@ env_init() ->
               ]
             },
             {resp_mode, body},
-            {resp_protocol_model, pg_mcht_protocol_resp_collect},
-            {fail_template, x},
-            {succ_template, x}
+            {resp_protocol_model, pg_mcht_protocol_resp_collect}
 
           ]
         },
@@ -171,7 +168,6 @@ env_init() ->
                   {stage_handle_mcht_req,
                     [
                       {model_in, pg_mcht_protocol_req_batch_collect}
-                      , {model_repo, pg_txn_t_repo_mcht_txn_log_pt}
                     ]
                   }
                 },
@@ -211,9 +207,7 @@ env_init() ->
               ]
             },
             {resp_mode, body},
-            {resp_protocol_model, pg_mcht_protocol_resp_batch_collect},
-            {fail_template, x},
-            {succ_template, x}
+            {resp_protocol_model, pg_mcht_protocol_resp_batch_collect}
 
           ]
         },
@@ -240,9 +234,7 @@ env_init() ->
               ]
             },
             {resp_mode, body},
-            {resp_protocol_model, pg_mcht_protocol_resp_batch_collect},
-            {fail_template, x},
-            {succ_template, x}
+            {resp_protocol_model, pg_mcht_protocol_resp_batch_collect}
           ]
 
         },
@@ -284,9 +276,34 @@ env_init() ->
               ]
             },
             {resp_mode, body},
-            {resp_protocol_model, pg_mcht_protocol_resp_batch_collect},
-            {fail_template, x},
-            {succ_template, x}
+            {resp_protocol_model, pg_mcht_protocol_resp_batch_collect}
+          ]
+
+        },
+        {mcht_txn_query,
+          [
+            {stages,
+              [
+                {stage,
+                  {stage_handle_mcht_req_query,
+                    [
+                      {model_in, pg_mcht_protocol_req_query}
+                    ]
+                  }
+                },
+                {stage,
+                  {stage_return_mcht_resp,
+                    [
+                      {model_in, pg_txn_t_repo_mcht_txn_log_pt}
+                      , {model_out, pg_mcht_protocol_resp_query}
+
+                    ]
+                  }}
+
+              ]
+            },
+            {resp_mode, body},
+            {resp_protocol_model, pg_mcht_protocol_resp_batch_collect}
           ]
 
         }
@@ -433,23 +450,9 @@ mcht_txn_req_collect_test_1() ->
 
 
   %% stage 1,handle_mcht_req
-%%  PV = qs(collect) ++ [{<<"signature">>, sig(collect)}],
   PV = req_collect_pv(),
 %%  {_, Result} = pg_txn:handle(mcht_txn_req_collect, PV),
   {PMchtReq, RepoMcht} = stage_action(TxnType, stage_handle_mcht_req, PV),
-%%  Exp = {mcht_txn_log, {<<"00001">>, <<"20171021">>,
-%%    <<"20171021095817473460847">>},
-%%    collect, <<"00001">>, <<"20171021">>,
-%%    <<"095817">>, <<"20171021095817473460847">>, 50,
-%%    <<"测试交易"/utf8>>,
-%%    undefined, undefined,
-%%    <<"http://localhost:8888/pg/simu_mcht_back_succ_info">>,
-%%    undefined, undefined, undefined, undefined,
-%%    undefined, undefined, undefined, undefined,
-%%    undefined, waiting, <<"6216261000000000018">>,
-%%    <<"01">>, <<"341126197709218366">>,
-%%    <<"全渠道"/utf8>>,
-%%    <<"13552535506">>},
   ?assertEqual(
     [
       {<<"00001">>, <<"20171021">>, <<"20171021095817473460847">>}
@@ -462,17 +465,11 @@ mcht_txn_req_collect_test_1() ->
       [mcht_index_key, txn_type, bank_card_no, id_type, id_no, id_name, mobile])),
 
   %% stage 2,gen_up_req
-%%  {PUpReq, RepoUp} = stage_action(TxnType, stage_gen_up_req, {PMchtReq, RepoMcht}),
-%%  ?assertEqual([pk(collect), <<"6216261000000000018">>, <<"341126197709218366">>, <<"全渠道"/utf8>>, <<"13552535506">>],
-%%    pg_model:get(pg_txn_t_repo_up_txn_log_pt, RepoUp, [mcht_index_key, up_accNo, up_idNo, up_idName, up_mobile])),
-%%  ?debugFmt("PUpReq = ~p~nRepoUp = ~p", [PUpReq, RepoUp]),
   PUpReq = stage_action(TxnType, stage_gen_up_req, {PMchtReq, RepoMcht}),
   ?debugFmt("PUpReq = ~p", [PUpReq]),
 
   %% stage 3,send_up_req
-%%  {Status, Headers, Body} = stage_action(TxnType, stage_send_up_req, {PUpReq, RepoUp}),
   {StatusCode, Headers, Body} = stage_action(TxnType, stage_send_up_req, PUpReq),
-%%  ?assertEqual({"HTTP/1.1", 200, "OK"}, Status),
   ?assertEqual(200, StatusCode),
   ?assertEqual("UPJAS", proplists:get_value("server", Headers)),
   ?assertEqual(<<"UTF-8">>, proplists:get_value(<<"encoding">>, xfutils:parse_post_body(Body))),
@@ -529,6 +526,26 @@ mcht_txn_req_collect_test_1() ->
   Return = stage_action(TxnTypeQuery, stage_return_mcht_info, {RepoUpQueryNew, RepoMchtQueryNew}),
   ?assertEqual([], Return),
 
+  %%-----------------------------------------------------------------------------------
+  %% mcht query
+  TxnTypeMchtQuery = mcht_txn_query,
+  MRepoMcht = pg_txn:repo_module(mcht_txn_log),
+  PVMchtQuery = lists:zip([<<"merchId">>, <<"tranDate">>, <<"tranTime">>, <<"tranId">>],
+    pg_model:get(MRepoMcht, RepoMchtQueryNew, [mcht_id, txn_date, txn_time, txn_seq])),
+  P = pg_mcht_protocol:out_2_in(pg_mcht_protocol_req_query, PVMchtQuery),
+  PSig = pg_txn:mcht_sign(pg_mcht_protocol_req_query, P),
+  ?debugFmt("PSig = ~p", [PSig]),
+  OrigMchtTxn = stage_action(TxnTypeMchtQuery, stage_handle_mcht_req_query,
+    PVMchtQuery ++ [{<<"signature">>, pg_model:get(pg_mcht_protocol_req_query, PSig, signature)}]),
+  ?assertEqual([success], pg_model:get(MRepoMcht, OrigMchtTxn, [txn_status])),
+
+  ReturnBodyQuery = stage_action(TxnTypeMchtQuery, stage_return_mcht_resp, {{}, OrigMchtTxn}),
+  ?debugFmt("ReturnBodyQuery = ~ts", [ReturnBodyQuery]),
+  ?assertNotEqual(nomatch, binary:match(iolist_to_binary(ReturnBodyQuery), <<"origRespCode=", "00">>)),
+  SuccessMsg = <<"成功%5B0000000%5D"/utf8>>,
+  ?assertNotEqual(nomatch, binary:match(iolist_to_binary(ReturnBodyQuery), <<"origRespMsg=", SuccessMsg/binary>>)),
+  ?assertNotEqual(nomatch, binary:match(iolist_to_binary(ReturnBodyQuery), <<"respCode=", "00">>)),
+  ?assertNotEqual(nomatch, binary:match(iolist_to_binary(ReturnBodyQuery), <<"respMsg=", "success">>)),
 
   ok.
 %%--------------------------------------------------------------------

@@ -61,9 +61,7 @@
               ]
             },
             {resp_mode, body},
-            {resp_protocol_model, pg_mcht_protocol_resp_collect},
-            {fail_template, x},
-            {succ_template, x}
+            {resp_protocol_model, pg_mcht_protocol_resp_collect}
           ]
         },
         {mcht_txn_req_batch_collect,
@@ -114,9 +112,7 @@
               ]
             },
             {resp_mode, body},
-            {resp_protocol_model, pg_mcht_protocol_resp_batch_collect},
-            {fail_template, x},
-            {succ_template, x}
+            {resp_protocol_model, pg_mcht_protocol_resp_batch_collect}
 
           ]
         },
@@ -144,9 +140,7 @@
               ]
             },
             {resp_mode, body},
-            {resp_protocol_model, pg_mcht_protocol_info_collect},
-            {fail_template, x},
-            {succ_template, x}
+            {resp_protocol_model, pg_mcht_protocol_info_collect}
           ]
 
         },
@@ -188,9 +182,34 @@
               ]
             },
             {resp_mode, body},
-            {resp_protocol_model, pg_mcht_protocol_resp_batch_collect},
-            {fail_template, x},
-            {succ_template, x}
+            {resp_protocol_model, pg_mcht_protocol_resp_batch_collect}
+          ]
+
+        },
+        {mcht_txn_query,
+          [
+            {stages,
+              [
+                {stage,
+                  {stage_handle_mcht_req_query,
+                    [
+                      {model_in, pg_mcht_protocol_req_query}
+                    ]
+                  }
+                },
+                {stage,
+                  {stage_return_mcht_resp,
+                    [
+                      {model_in, repo_mcht_txn_log_pt}
+                      , {model_out, pg_mcht_protocol_resp_query}
+
+                    ]
+                  }}
+
+              ]
+            },
+            {resp_mode, body},
+            {resp_protocol_model, pg_mcht_protocol_resp_batch_collect}
           ]
 
         },
