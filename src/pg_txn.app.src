@@ -173,7 +173,7 @@
                   {stage_handle_up_resp_query,
                     [
                       {model_in, pg_up_protocol_resp_query}
-                      , {model_out, pg_mcht_protocol_resp_batch_collect}
+                      , {model_out, repo_up_txn_log_pt}
                     ]
                   }
                 },

@@ -269,7 +269,7 @@ env_init() ->
                   {stage_handle_up_resp_query,
                     [
                       {model_in, pg_up_protocol_resp_query}
-                      , {model_out, pg_mcht_protocol_resp_batch_collect}
+                      , {model_out, pg_txn_t_repo_up_txn_log_pt}
                     ]
                   }
                 },
@@ -481,7 +481,7 @@ mcht_txn_req_collect_test_1() ->
   {RepoUpNew, RepoMchtNew} = stage_action(TxnType, stage_handle_up_resp, {StatusCode, Headers, Body}),
   ?debugFmt("RepoUpNew = ~ts~nRepoMchtNew = ~ts", [pg_model:pr(pg_txn:repo_module(up_txn_log), RepoUpNew),
     pg_model:pr(pg_txn:repo_module(mcht_txn_log), RepoMchtNew)]),
-  ?assertEqual(50, pg_model:get(pg_txn:repo_module(up_txn_log), RepoUpNew, up_txnAmt)),
+  ?assertEqual([50, waiting], pg_model:get(pg_txn:repo_module(up_txn_log), RepoUpNew, [up_txnAmt, txn_status])),
 
   %% stage 5,send_mcht_resp
   ReturnBody = stage_action(TxnType, stage_return_mcht_resp, {RepoUpNew, RepoMchtNew}),

@@ -475,8 +475,9 @@ convert_update_fetch(MIn, PIn, MRepoUpdate) when is_atom(MIn), is_atom(MRepoUpda
   VL = pg_convert:convert(MIn, PIn),
   %% update
   {ok, RepoNew} = pg_repo:update(MRepoUpdate, VL),
-  lager:debug("VL = ~p,PIn = ~ts", [VL,pg_model:pr(MIn,PIn)]),
-  lager:debug("RepoNew = ~ts", [VL, pg_model:pr(MRepoUpdate, RepoNew)]),
+  lager:debug("VL = ~p,PIn = ~p,MIn = ~p", [VL, PIn, MIn]),
+  lager:debug("VL = ~p,PIn = ~ts", [VL, pg_model:pr(MIn, PIn)]),
+  lager:debug("RepoNew = ~ts", [pg_model:pr(MRepoUpdate, RepoNew)]),
   %% fetch
   RepoFull = fetch_orig(MRepoUpdate, RepoNew),
   lager:debug("RepoFull = ~ts", [pg_model:pr(MRepoUpdate, RepoFull)]),
@@ -513,4 +514,11 @@ fetch_orig(MRepo, Repo) when is_atom(MRepo), is_tuple(Repo) ->
                  Key ->
                    pg_repo:read_index(MRepo, Key, Value)
                end,
+  case RepoOrig of
+    [] ->
+      %% not found
+      throw({orig_txn_not_found, MRepo, Repo});
+    _ ->
+      ok
+  end,
   RepoOrig.
