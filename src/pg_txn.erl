@@ -63,34 +63,19 @@ stage_gen_up_req({PMchtReq, RepoMchtTxnLog}, Options)
 
   %% convert to up req
   MOut = proplists:get_value(model_out, Options),
-%%  lager:debug("Mout = ~p,PMchtReq = ~p", [MOut, PMchtReq]),
-%%  PUpReq = pg_convert:convert(MOut, PMchtReq),
-%%  lager:debug("PUpReq = ~p", [PUpReq]),
 
   %% sign
-%%  Sig = pg_up_protocol:sign(MOut, PUpReq),
-%%  PUpReqWithSig = up_sign(MOut, PUpReq),
-
   PUpReqWithSig = convert_sign(MOut, PMchtReq),
-%%    pg_model:set(MOut, PUpReq, signature, Sig),
 
   lager:debug("PUpReqWithSig = ~p", [PUpReqWithSig]),
 
   %% convert to up_txn_log
   %% save up_txn_log
   ok = save_up_req(MOut, PUpReqWithSig),
-%%  RepoUpReq = pg_convert:convert(MOut, PUpReq, save_req),
-%%  lager:debug("RepoUpReq = ~p", [RepoUpReq]),
 
-%%  ok = pg_repo:save(RepoUpReq),
-
-
-%%  {PUpReqWithSig, RepoUpReq}.
   PUpReqWithSig.
 %%-----------------------------------------------------------------
 %% stage 3
-%%stage_send_up_req({PUpReq, _RepoUpReq}, Options)
-%%  when is_tuple(PUpReq), is_tuple(_RepoUpReq), is_list(Options) ->
 stage_send_up_req(PUpReq, Options)
   when is_tuple(PUpReq), is_list(Options) ->
   %% convert PUpReq to post
@@ -113,7 +98,7 @@ stage_send_up_req(PUpReq, Options)
 
 %%-----------------------------------------------------------------
 %% stage 4
-stage_handle_up_resp({Status, Headers, Body}, Options) when is_binary(Body) ->
+stage_handle_up_resp({_Status, _Headers, Body}, Options) when is_binary(Body) ->
   PV = xfutils:parse_post_body(Body),
   MIn = proplists:get_value(model_in, Options),
   PUpResp = pg_protocol:out_2_in(MIn, PV),
@@ -123,21 +108,12 @@ stage_handle_up_resp({Status, Headers, Body}, Options) when is_binary(Body) ->
   MRepoUp = pg_txn:repo_module(up_txn_log),
   RepoUpNew = update_txn_log(MIn, {MIn, PUpResp}, MRepoUp),
 
-%%  VLUp = pg_convert:convert(MIn, PUpResp),
-%%  {ok, RepoUpNew} = pg_repo:update(MRepoUp, VLUp),
 
   %% update_mcht_txn_log
   MOut = proplists:get_value(model_out, Options),
   MRepoMcht = pg_txn:repo_module(mcht_txn_log),
   RepoMchtNew = update_txn_log(MOut, {MRepoUp, RepoUpNew}, MRepoMcht),
-%%  VL = pg_convert:convert(MOut, RepoUpNew),
-%%  {ok, RepoMchtNew} = pg_repo:update(MRepoMcht, VL),
-%%  lager:debug("VL = ~p~nRepoMchtNew = ~p", [VL, RepoMchtNew]),
-  %%  MchtIndexKey = pg_model:get(MRepoUp, RepoUpNew, mcht_index_key),
-  %%  {ok, RepoMchtNew} = pg_repo:update_pk(MRepoMcht, MchtIndexKey,
-  %%    [{resp_code, UpRespCd}, {resp_msg, UpRespMsg}, {txn_status, xfutils:up_resp_code_2_txn_status(UpRespCd)}]),
 
-%%  lager:debug("MRepoUp = ~ts~nMRepoMcht = ~ts", [pg_model:pr(MRepoUp, RepoUpNew), pg_model:pr(MRepoMcht, RepoMchtNew)]),
   {RepoUpNew, RepoMchtNew}.
 
 %%-----------------------------------------------------------------
@@ -145,19 +121,8 @@ stage_handle_up_resp({Status, Headers, Body}, Options) when is_binary(Body) ->
 stage_return_mcht_resp({RepoUpResp, RepoMchtNew}, Options) when is_tuple(RepoUpResp) ->
   %% in_2_out
   MOut = proplists:get_value(model_out, Options),
-%%  PMchtResp = pg_convert:convert(MOut, RepoMchtNew, normal_resp),
-%%  lager:debug("PMchtResp = ~ts", [pg_model:pr(MOut, PMchtResp)]),
 
-%%  {SignString, Sig} = pg_mcht_protocol:sign(MOut, PMchtResp),
-%%  lager:debug("Return mcht resp ,signstring = ~ts,sig=~p", [SignString, Sig]),
-%%  lager:debug("Return mcht resp ,signstring = ~ts,sig=~p", [SignString, Sig]),
-
-
-%%  PMchtRespWithSig = pg_model:set(MOut, PMchtResp, signature, Sig),
-%%  PMchtRespWithSig = mcht_sign(MOut, PMchtResp),
   PMchtRespWithSig = convert_sign(MOut, RepoMchtNew, normal_resp),
-%%  lager:debug("PMchtRespWithSig = ~ts", [pg_model:pr(MOut, PMchtRespWithSig)]),
-%%  lager:debug("Resp msg verify result = ~p", [pg_mcht_protocol:verify(MOut, PMchtRespWithSig)]),
   lager:debug("Resp msg verify result = ~p", [pg_mcht_protocol:verify(MOut, PMchtRespWithSig)]),
 
   %% resp body
@@ -165,10 +130,6 @@ stage_return_mcht_resp({RepoUpResp, RepoMchtNew}, Options) when is_tuple(RepoUpR
 %%-----------------------------------------------------------------
 %% stage 6
 stage_handle_up_info(PV, Options) when is_list(PV), is_list(Options) ->
-  %% parse body
-%%  lager:debug("==============  in stage_handle_up_info =============", []),
-%%  PV = xfutils:parse_post_body(Body),
-%%  lager:debug("PV = ~p", [PV]),
 
   %% out_2_in
   MIn = proplists:get_value(model_in, Options),
@@ -181,17 +142,11 @@ stage_handle_up_info(PV, Options) when is_list(PV), is_list(Options) ->
   %% update status
   MRepoUp = pg_txn:repo_module(up_txn_log),
   RepoUpNew = convert_update_fetch(MIn, UpInfoCollect, MRepoUp),
-%%  UpVL = pg_convert:convert(MIn, UpInfoCollect),
-%%  {ok, RepoUpNew} = pg_repo:update(MRepoUp, UpVL),
-%%  lager:debug("UpVL = ~p~nRepoUpNew = ~ts", [UpVL, pg_model:pr(MRepoUp, RepoUpNew)]),
 
   %% update_mcht_txn_log
   MRepoMcht = pg_txn:repo_module(mcht_txn_log),
   MOut = proplists:get_value(model_out, Options),
   RepoMchtNew = convert_update_fetch(MOut, RepoUpNew, MRepoMcht),
-%%  VL = pg_convert:convert(MOut, RepoUpNew),
-%%  {ok, RepoMchtNew} = pg_repo:update(MRepoMcht, VL),
-%%  lager:debug("MOut = ~p,VL = ~p~nRepoMchtNew = ~ts", [MOut, VL, pg_model:pr(MRepoMcht, RepoMchtNew)]),
 
   lager:debug("MRepoUp = ~ts~nMRepoMcht = ~ts",
     [pg_model:pr(MRepoUp, RepoUpNew), pg_model:pr(MRepoMcht, RepoMchtNew)]),
@@ -200,27 +155,17 @@ stage_handle_up_info(PV, Options) when is_list(PV), is_list(Options) ->
 
 %%-----------------------------------------------------------------
 %% stage 7
-stage_return_mcht_info({RepoUp, RepoMcht}, Options) ->
+stage_return_mcht_info({_RepoUp, RepoMcht}, Options) ->
 %% post  to mcht back_url
   MOut = proplists:get_value(model_out, Options),
-%% update mcht_txn_log
-%%  PMchtInfo = pg_convert:convert(MOut, RepoMcht, normal_resp),
-%%  lager:debug("PMchtInfo = ~p", [PMchtInfo]),
-
-%%  {SignString, Sig} = pg_mcht_protocol:sign(MOut, PMchtInfo),
-%%  lager:debug("Return mcht info ,signstring = ~ts,sig=~p", [SignString, Sig]),
-%%  PMchtInfoWithSig = pg_model:set(MOut, PMchtInfo, signature, Sig),
-%%  PMchtInfoWithSig = mcht_sign(MOut, PMchtInfo),
 
   PMchtInfoWithSig = convert_sign(MOut, RepoMcht, normal_resp),
 
 
-%%  lager:debug("PMchtInfoWithSig = ~ts", [pg_model:pr(MOut, PMchtInfoWithSig)]),
-%%  lager:debug("Info msg verify result = ~p", [pg_mcht_protocol:verify(MOut, PMchtInfoWithSig)]),
   lager:debug("Info msg verify result = ~p", [pg_mcht_protocol:verify(MOut, PMchtInfoWithSig)]),
 
-%% resp body
-%% @todo: use pg_notify_service to handle info, timeout , resend info ...
+  %% resp body
+  %% @todo: use pg_notify_service to handle info, timeout , resend info ...
   InfoBody = pg_mcht_protocol:in_2_out(MOut, PMchtInfoWithSig, post),
   MRepoMcht = pg_txn:repo_module(mcht_txn_log),
   InfoUrl = pg_model:get(MRepoMcht, RepoMcht, back_url),
@@ -228,14 +173,6 @@ stage_return_mcht_info({RepoUp, RepoMcht}, Options) ->
   try
     {200, Header, Body} = do_post(InfoUrl, InfoBody),
     {200, Header, Body}
-%%    {ok, {Status, Headers, Body}} = httpc:request(post,
-%%      {binary_to_list(InfoUrl), [], "application/x-www-form-urlencoded", iolist_to_binary(InfoBody)}, %% Request
-%%      [],                 %% HTTPOptions
-%%      [{body_format, binary}]                %% Options
-%%    ),
-%%    lager:debug("http Statue = ~p~nHeaders  = ~p~nBody=~ts~n", [Status, Headers, Body]),
-%%    lager:debug("http Statue = ~p~nHeaders  = ~p~nBody=~ts~n", [Status, Headers, Body]),
-%%    {Status, Headers, Body}
   catch
     _:_ ->
       throw({send_up_req_stop, <<"99">>, <<"商户通知接受错误"/utf8>>, {model, MOut, PMchtInfoWithSig}})
@@ -252,15 +189,10 @@ stage_gen_up_query(UpIndexKey, Options) when is_list(Options), is_tuple(UpIndexK
   {ok, [RepoUp]} = pg_repo:fetch_index(MRepoUp, {up_index_key, UpIndexKey}),
 
   convert_sign(MOut, RepoUp).
-%%  PUQuery = pg_convert:convert(MOut, RepoUp),
-%%  PUQueryWithSig = up_sign(MOut, PUQuery),
-%%
-%%  PUQueryWithSig.
 
 %%-----------------------------------------------------------------
 %% stage 9 , handle_up_resp_query
-stage_handle_up_resp_query({Status, Headers, Body}, Options) when is_binary(Body) ->
-%%  lager:debug("Enter stage_handle_up_resp_query ====================", []),
+stage_handle_up_resp_query({_Status, _Headers, Body}, Options) when is_binary(Body) ->
   PV = xfutils:parse_post_body(Body),
   MIn = proplists:get_value(model_in, Options),
   PUpResp = pg_protocol:out_2_in(MIn, PV),
@@ -281,30 +213,23 @@ stage_handle_up_resp_query({Status, Headers, Body}, Options) when is_binary(Body
   end,
 
   %% respCode is <<"00">>
-  [UpIndexKey, UpRespCd, UpRespMsg, UpQueryId, OrigRespCode, OrigRespMsg] =
-    pg_up_protocol:get(MIn, PUpResp, [up_index_key, respCode, respMsg, queryId, origRespCode, origRespMsg]),
-
-  lager:debug("UpIndexKey = ~p,UpRespCd = ~p,UpRespMsg = ~ts",
-    [UpIndexKey, UpRespCd, pg_model:pr(MIn, PUpResp)]),
+%%  [UpIndexKey, UpRespCd, UpRespMsg, UpQueryId, OrigRespCode, OrigRespMsg] =
+%%    pg_up_protocol:get(MIn, PUpResp, [up_index_key, respCode, respMsg, queryId, origRespCode, origRespMsg]),
+%%
+%%  lager:debug("UpIndexKey = ~p,UpRespCd = ~p,UpRespMsg = ~ts",
+%%    [UpIndexKey, UpRespCd, pg_model:pr(MIn, PUpResp)]),
 
   %% update up_txn_log
   MRepoUp = pg_txn:repo_module(up_txn_log),
-%%  VL = pg_convert:convert(MIn, PUpResp),
-%%  {ok, RepoUpNew} = pg_repo:update(MRepoUp, VL),
-%%  lager:debug("VL = ~p~nRepoUpNew = ~p", [VL, RepoUpNew]),
 
   RepoUpNew = convert_update_fetch(MIn, PUpResp, MRepoUp),
 
   %% update_mcht_txn_log
   MRepoMcht = pg_txn:repo_module(mcht_txn_log),
   MOut = proplists:get_value(model_out, Options),
-%%  VL1 = pg_convert:convert(MOut, RepoUpNew),
-%%  {ok, RepoMchtNew} = pg_repo:update(MRepoMcht, VL1),
-%%  lager:debug("VL = ~p~nRepoMchtNew = ~p", [VL1, RepoMchtNew]),
 
   RepoMchtNew = convert_update_fetch(MOut, RepoUpNew, MRepoMcht),
 
-%%  lager:debug("MRepoUp = ~ts~nMRepoMcht = ~ts", [pg_model:pr(MRepoUp, RepoUpNew), pg_model:pr(MRepoMcht, RepoMchtNew)]),
   {RepoUpNew, RepoMchtNew}.
 %%-----------------------------------------------------------------
 repo_module(mchants = TableName) ->
@@ -335,7 +260,7 @@ stage_options(MTxn, Stage) ->
   Stages = proplists:get_value(stages, TxnConfig),
 
   F = fun
-        ({stage, {StageName, Options}}, {StageName, AccIn}) ->
+        ({stage, {StageName, Options}}, {StageName, _AccIn}) ->
           {StageName, Options};
         (_, Acc) ->
           Acc
@@ -389,7 +314,7 @@ render_fail_result(M, TxnConfig, RespCd, RespMsg, Result) ->
   RespMode = proplists:get_value(resp_mode, TxnConfig),
   do_render_fail_result(RespMode, M, TxnConfig, RespCd, RespMsg, Result).
 
-do_render_fail_result(body, MTxn, TxnConfig, RespCd, RespMsg, {proplist, PV})
+do_render_fail_result(body, _MTxn, _TxnConfig, RespCd, RespMsg, {proplist, PV})
   when is_list(PV) ->
   %% before model create successfully
   %% return original PV , plus respcd/respmsg
@@ -405,7 +330,7 @@ do_render_fail_result(body, MTxn, TxnConfig, RespCd, RespMsg, {model, MIn, Proto
 %%  ok = pg_mcht_protocol:validate_biz(MTo, RespProtocol),
 
   RespProtocolWithResp = pg_model:set(MTo, RespProtocol, PVRespCdMsg),
-  {SignString, Sign} = pg_mcht_protocol:sign(MTo, RespProtocolWithResp),
+  {_SignString, Sign} = pg_mcht_protocol:sign(MTo, RespProtocolWithResp),
   RespProtocolWithSig = pg_model:set(MTo, RespProtocolWithResp, signature, Sign),
   PostFields = [signature | MTo:sign_fields()],
   In2OutMap = pg_mcht_protocol:in_2_out_map(),
