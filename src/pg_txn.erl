@@ -475,7 +475,8 @@ convert_update_fetch(MIn, PIn, MRepoUpdate) when is_atom(MIn), is_atom(MRepoUpda
   VL = pg_convert:convert(MIn, PIn),
   %% update
   {ok, RepoNew} = pg_repo:update(MRepoUpdate, VL),
-  lager:debug("VL = ~p~nRepoNew = ~ts", [VL, pg_model:pr(MRepoUpdate, RepoNew)]),
+  lager:debug("VL = ~p,PIn = ~ts", [VL,pg_model:pr(MIn,PIn)]),
+  lager:debug("RepoNew = ~ts", [VL, pg_model:pr(MRepoUpdate, RepoNew)]),
   %% fetch
   RepoFull = fetch_orig(MRepoUpdate, RepoNew),
   lager:debug("RepoFull = ~ts", [pg_model:pr(MRepoUpdate, RepoFull)]),
