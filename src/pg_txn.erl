@@ -120,7 +120,7 @@ stage_handle_up_resp({_Status, _Headers, Body}, Options) when is_binary(Body) ->
 
 %%-----------------------------------------------------------------
 %% stage 5
-stage_return_mcht_resp({RepoUpResp, RepoMchtNew}, Options) when is_tuple(RepoUpResp) ->
+stage_return_mcht_resp({_RepoUpResp, RepoMchtNew}, Options) when is_tuple(RepoMchtNew) ->
   %% in_2_out
   MOut = proplists:get_value(model_out, Options),
 
@@ -253,7 +253,7 @@ stage_handle_mcht_req_query(PV, Options) when is_list(PV), is_list(Options) ->
   OrigMchtIndexKey = pg_mcht_protocol:get(MIn, PMchtReqQuery, mcht_index_key),
   {ok, [OrigMchtTxn]} = pg_repo:fetch(MRepoMcht, OrigMchtIndexKey),
 
-  OrigMchtTxn.
+  {{}, OrigMchtTxn}.
 
 
 %%-----------------------------------------------------------------

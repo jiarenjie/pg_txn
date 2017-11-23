@@ -535,8 +535,8 @@ mcht_txn_req_collect_test_1() ->
   P = pg_mcht_protocol:out_2_in(pg_mcht_protocol_req_query, PVMchtQuery),
   PSig = pg_txn:mcht_sign(pg_mcht_protocol_req_query, P),
   ?debugFmt("PSig = ~p", [PSig]),
-  OrigMchtTxn = stage_action(TxnTypeMchtQuery, stage_handle_mcht_req_query,
-    PVMchtQuery ++ [{<<"signature">>, pg_model:get(pg_mcht_protocol_req_query, PSig, signature)}]),
+  PVMchtQueryWithSig = PVMchtQuery ++ [{<<"signature">>, pg_model:get(pg_mcht_protocol_req_query, PSig, signature)}],
+  {{}, OrigMchtTxn} = stage_action(TxnTypeMchtQuery, stage_handle_mcht_req_query, PVMchtQueryWithSig),
   ?assertEqual([success], pg_model:get(MRepoMcht, OrigMchtTxn, [txn_status])),
 
   ReturnBodyQuery = stage_action(TxnTypeMchtQuery, stage_return_mcht_resp, {{}, OrigMchtTxn}),
@@ -546,6 +546,10 @@ mcht_txn_req_collect_test_1() ->
   ?assertNotEqual(nomatch, binary:match(iolist_to_binary(ReturnBodyQuery), <<"origRespMsg=", SuccessMsg/binary>>)),
   ?assertNotEqual(nomatch, binary:match(iolist_to_binary(ReturnBodyQuery), <<"respCode=", "00">>)),
   ?assertNotEqual(nomatch, binary:match(iolist_to_binary(ReturnBodyQuery), <<"respMsg=", "success">>)),
+
+  %% via pg_txn:handle
+  ?assertEqual(ReturnBodyQuery, pg_txn:handle(TxnTypeMchtQuery, PVMchtQueryWithSig)),
+
 
   ok.
 %%--------------------------------------------------------------------
@@ -639,7 +643,7 @@ batch_collect_test_1() ->
   ok.
 %%--------------------------------------------------------------------
 echo_server_test_1() ->
-  {StatusCode, Header, Body} = xfutils:post("http://localhost:9999/esi/pg_test_utils_echo_server:echo", <<"a=b&c=d">>),
+  {StatusCode, _Header, Body} = xfutils:post("http://localhost:9999/esi/pg_test_utils_echo_server:echo", <<"a=b&c=d">>),
   ?assertEqual(200, StatusCode),
   ?assertEqual("a=b&c=d", Body),
   ok.
