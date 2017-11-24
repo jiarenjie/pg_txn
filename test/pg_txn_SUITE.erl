@@ -28,6 +28,7 @@ setup() ->
   application:start(inets),
   pg_test_utils:http_echo_server_init(),
   application:start(pg_quota),
+  application:start(pg_redoer),
 
   pg_repo:drop(?M_Repo),
   pg_repo:init(?M_Repo),
@@ -568,7 +569,7 @@ mcht_txn_req_collect_test_1() ->
   %%-----------------------------------------------------------------------------------
   %% quota check
   ?debugFmt("dirty all keys = ~p", [mnesia:dirty_all_keys(mcht_txn_acc)]),
-  ?assertEqual(50, pg_repo:fetch_by(pg_txn_t_repo_mcht_txn_acc_pt, {1, collect,<<"20171021">>}, acc)),
+  ?assertEqual(50, pg_repo:fetch_by(pg_txn_t_repo_mcht_txn_acc_pt, {1, collect, <<"20171021">>}, acc)),
 
   ok.
 %%--------------------------------------------------------------------
@@ -664,7 +665,7 @@ batch_collect_test_1() ->
 echo_server_test_1() ->
   {StatusCode, _Header, Body} = xfutils:post("http://localhost:9999/esi/pg_test_utils_echo_server:echo", <<"a=b&c=d">>),
   ?assertEqual(200, StatusCode),
-  ?assertEqual("a=b&c=d", Body),
+  ?assertEqual(<<"a=b&c=d">>, Body),
   ok.
 %%--------------------------------------------------------------------
 info_collect_test_1() ->

@@ -175,13 +175,15 @@ stage_return_mcht_info({_RepoUp, RepoMcht}, Options) ->
   MRepoMcht = pg_txn:repo_module(mcht_txn_log),
   InfoUrl = pg_model:get(MRepoMcht, RepoMcht, back_url),
 
-  try
-    {200, Header, Body} = do_post(InfoUrl, InfoBody),
-    {200, Header, Body}
-  catch
-    _:_ ->
-      throw({send_up_req_stop, <<"99">>, <<"商户通知接受错误"/utf8>>, {model, MOut, PMchtInfoWithSig}})
-  end,
+%%  try
+%%    {200, Header, Body} = do_post(InfoUrl, InfoBody),
+%%    {200, Header, Body}
+%%  catch
+%%    _:_ ->
+%%      throw({send_up_req_stop, <<"99">>, <<"商户通知接受错误"/utf8>>, {model, MOut, PMchtInfoWithSig}})
+%%  end,
+
+  pg_redoer:add_notify(InfoUrl, list_to_binary(InfoBody)),
 
 
   [].
