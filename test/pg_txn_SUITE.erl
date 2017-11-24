@@ -27,6 +27,7 @@ setup() ->
   application:start(up_config),
   application:start(inets),
   pg_test_utils:http_echo_server_init(),
+  application:start(pg_quota),
 
   pg_repo:drop(?M_Repo),
   pg_repo:init(?M_Repo),
@@ -46,6 +47,7 @@ db_init() ->
         [
           {id, 1}
           , {payment_method, [gw_collect1]}
+          , {quota, [{txn, 10000}, {daily, 20000}, {monthly, 30000}]}
         ],
         [
           {id, 2}
@@ -68,6 +70,11 @@ db_init() ->
       ]
     },
     {pg_txn:repo_module(up_txn_log),
+      [
+
+      ]
+    },
+    {pg_quota:repo_module(mcht_txn_acc),
       [
 
       ]
@@ -99,6 +106,13 @@ env_init() ->
         {mchants_repo_name, pg_txn_t_repo_mchants_pt}
         , {up_repo_name, pg_txn_t_repo_up_txn_log_pt}
 %%        , {debug, true}
+
+      ]
+    },
+    {pg_quota,
+      [
+        {mcht_repo_name, pg_txn_t_repo_mchants_pt}
+        , {mcht_txn_acc_repo_name, pg_txn_t_repo_mcht_txn_acc_pt}
 
       ]
     },
@@ -478,7 +492,8 @@ mcht_txn_req_collect_test_1() ->
   {RepoUpNew, RepoMchtNew} = stage_action(TxnType, stage_handle_up_resp, {StatusCode, Headers, Body}),
   ?debugFmt("RepoUpNew = ~ts~nRepoMchtNew = ~ts", [pg_model:pr(pg_txn:repo_module(up_txn_log), RepoUpNew),
     pg_model:pr(pg_txn:repo_module(mcht_txn_log), RepoMchtNew)]),
-  ?assertEqual([50, waiting], pg_model:get(pg_txn:repo_module(up_txn_log), RepoUpNew, [up_txnAmt, txn_status])),
+  ?assertEqual([50, waiting, collect], pg_model:get(pg_txn:repo_module(up_txn_log), RepoUpNew,
+    [up_txnAmt, txn_status, txn_type])),
 
   %% stage 5,send_mcht_resp
   ReturnBody = stage_action(TxnType, stage_return_mcht_resp, {RepoUpNew, RepoMchtNew}),
@@ -550,6 +565,10 @@ mcht_txn_req_collect_test_1() ->
   %% via pg_txn:handle
   ?assertEqual(ReturnBodyQuery, pg_txn:handle(TxnTypeMchtQuery, PVMchtQueryWithSig)),
 
+  %%-----------------------------------------------------------------------------------
+  %% quota check
+  ?debugFmt("dirty all keys = ~p", [mnesia:dirty_all_keys(mcht_txn_acc)]),
+  ?assertEqual(50, pg_repo:fetch_by(pg_txn_t_repo_mcht_txn_acc_pt, {1, collect,<<"20171021">>}, acc)),
 
   ok.
 %%--------------------------------------------------------------------
@@ -655,16 +674,18 @@ info_collect_test_1() ->
   ok = pg_repo:save(MRepoUp,
     pg_model:new(MRepoUp,
       [
-        {mcht_index_key, {a, b, c}}
+        {mcht_index_key, {<<"00001">>, <<"20171115">>, <<"111">>}}
         , {up_index_key, {<<"777290058110097">>, <<"20171115104441">>, <<"20171115104441561205906">>}}
         , {up_orderId, <<"20171115104441561205906">>}
+        , {txn_type, collect}
+        , {up_txnAmt, 50}
       ])),
 
   MRepoMcht = pg_txn:repo_module(mcht_txn_log),
   ok = pg_repo:save(MRepoMcht,
     pg_model:new(MRepoMcht,
       [
-        {mcht_index_key, {a, b, c}}
+        {mcht_index_key, {<<"00001">>, <<"20171115">>, <<"111">>}}
         , {back_url, <<"http://localhost:9999/esi/pg_test_utils_echo_server:echo">>}
         , {txn_amt, <<"50">>}
         , {order_desc, <<"测试交易"/utf8>>}
@@ -677,13 +698,14 @@ info_collect_test_1() ->
         , {id_no, <<"341126197709218366">>}
         , {id_name, <<"全渠道"/utf8>>}
         , {mobile, <<"13552535506">>}
+        , {txn_type, collect}
       ])),
 
   TxnType = up_txn_info_collect,
   PV = qs(up_info_collect),
 
   {RepoUp, RepoMcht} = stage_action(TxnType, stage_handle_up_info, PV),
-  ?assertEqual([{a, b, c}, <<"20171115104441561205906">>],
+  ?assertEqual([{<<"00001">>, <<"20171115">>, <<"111">>}, <<"20171115104441561205906">>],
     pg_model:get(MRepoMcht, RepoMcht, [mcht_index_key, query_id])),
 
   stage_action(TxnType, stage_return_mcht_info, {RepoUp, RepoMcht}),

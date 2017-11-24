@@ -145,6 +145,9 @@ stage_handle_up_info(PV, Options) when is_list(PV), is_list(Options) ->
   MRepoUp = pg_txn:repo_module(up_txn_log),
   RepoUpNew = convert_update_fetch(MIn, UpInfoCollect, MRepoUp),
 
+  %% update quota
+  update_quota(MRepoUp, RepoUpNew),
+
   %% update_mcht_txn_log
   MRepoMcht = pg_txn:repo_module(mcht_txn_log),
   MOut = proplists:get_value(model_out, Options),
@@ -225,6 +228,9 @@ stage_handle_up_resp_query({_Status, _Headers, Body}, Options) when is_binary(Bo
   MRepoUp = pg_txn:repo_module(up_txn_log),
 
   RepoUpNew = convert_update_fetch(MIn, PUpResp, MRepoUp),
+
+  %% update quota
+  update_quota(MRepoUp, RepoUpNew),
 
   %% update_mcht_txn_log
   MRepoMcht = pg_txn:repo_module(mcht_txn_log),
@@ -472,3 +478,20 @@ fetch_orig(MRepo, Repo) when is_atom(MRepo), is_tuple(Repo) ->
       ok
   end,
   RepoOrig.
+%%-----------------------------------------------------------------
+update_quota(MRepoUp, RepoUp) when is_atom(MRepoUp), is_tuple(RepoUp) ->
+  [UpTxnStatus, MchtIndexKey, TxnAmt, TxnType] = pg_model:get(MRepoUp, RepoUp,
+    [txn_status, mcht_index_key, up_txnAmt, txn_type]),
+  MRepoMcht = pg_txn:repo_module(mcht_txn_log),
+  MchtTxnStatus = pg_repo:fetch_by(MRepoMcht, MchtIndexKey, txn_status),
+  true = (not_found =/= MchtTxnStatus),
+  {MchtId, TxnDate, _} = MchtIndexKey,
+  lager:debug("RepoUp = ~ts", [pg_model:pr(MRepoUp, RepoUp)]),
+  lager:debug("MchtId = ~p,TxnType=~p,TxnDate = ~p,TxnAmt = ~p", [MchtId, TxnType, TxnDate, TxnAmt]),
+  do_update_quota({MchtId, TxnType, TxnDate, TxnAmt}, UpTxnStatus, MchtTxnStatus).
+
+do_update_quota({MchtId, TxnType, TxnDate, TxnAmt}, success, waiting) ->
+  pg_quota:update(MchtId, TxnType, TxnDate, TxnAmt);
+do_update_quota(_, _, _) ->
+  ok.
+
