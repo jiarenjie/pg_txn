@@ -502,8 +502,18 @@ issue_query_redo(UpIndexKey) when is_tuple(UpIndexKey) ->
               end,
   ResultHandleFun = fun
                       (Result) ->
-                        [success] = Result,
-                        ok
+                        %% query result = success/fail, no need query any more
+                        %% query result = waiting, continue
+                        case Result of
+                          [success] ->
+                            ok;
+                          [fail] ->
+                            ok;
+                          [waiting] ->
+                            continue;
+                          _ ->
+                            continue
+                        end
                     end,
 
   pg_redoer:add_query(UpIndexKey, ActionFun, ResultHandleFun),
