@@ -94,8 +94,8 @@ stage_send_up_req(PUpReq, Options)
     {200, Header, Body} = do_post(PostUrl, PostBody),
 
     %% add query request
-    UpIndexKey = pg_up_protocol:get(MIn, PUpReq, up_index_key),
-    issue_query_redo(UpIndexKey),
+%%    UpIndexKey = pg_up_protocol:get(MIn, PUpReq, up_index_key),
+    issue_query_redo(MIn,PUpReq),
     {200, Header, Body}
   catch
     _:_ ->
@@ -494,7 +494,15 @@ do_update_quota(_, _, _) ->
   ok.
 
 %%-----------------------------------------------------------------
-issue_query_redo(UpIndexKey) when is_tuple(UpIndexKey) ->
+issue_query_redo(M, P) ->
+  TxnType = maps:get(txn_type, M:optons()),
+  do_issue_query_redo(TxnType, M, P).
+
+do_issue_query_redo(query, _, _) ->
+  %% no need add redoers
+  ok;
+do_issue_query_redo(_, M, P) ->
+  UpIndexKey = pg_up_protocol:get(M, P, up_index_key),
 
   ActionFun = fun
                 (QueryParam) ->
