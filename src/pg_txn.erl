@@ -92,6 +92,10 @@ stage_send_up_req(PUpReq, Options)
   %% receive response
   try
     {200, Header, Body} = do_post(PostUrl, PostBody),
+
+    %% add query request
+    UpIndexKey = pg_up_protocol:get(MIn, PUpReq, up_index_key),
+    issue_query_redo(UpIndexKey),
     {200, Header, Body}
   catch
     _:_ ->
@@ -170,18 +174,9 @@ stage_return_mcht_info({_RepoUp, RepoMcht}, Options) ->
   lager:debug("Info msg verify result = ~p", [pg_mcht_protocol:verify(MOut, PMchtInfoWithSig)]),
 
   %% resp body
-  %% @todo: use pg_notify_service to handle info, timeout , resend info ...
   InfoBody = pg_mcht_protocol:in_2_out(MOut, PMchtInfoWithSig, post),
   MRepoMcht = pg_txn:repo_module(mcht_txn_log),
   InfoUrl = pg_model:get(MRepoMcht, RepoMcht, back_url),
-
-%%  try
-%%    {200, Header, Body} = do_post(InfoUrl, InfoBody),
-%%    {200, Header, Body}
-%%  catch
-%%    _:_ ->
-%%      throw({send_up_req_stop, <<"99">>, <<"商户通知接受错误"/utf8>>, {model, MOut, PMchtInfoWithSig}})
-%%  end,
 
   pg_redoer:add_notify(InfoUrl, list_to_binary(InfoBody)),
 
@@ -497,3 +492,17 @@ do_update_quota({MchtId, TxnType, TxnDate, TxnAmt}, success, waiting) ->
 do_update_quota(_, _, _) ->
   ok.
 
+%%-----------------------------------------------------------------
+issue_query_redo(UpIndexKey) when is_tuple(UpIndexKey) ->
+
+  ActionFun = fun
+                (QueryParam) ->
+                  pg_txn:handle(up_txn_query, QueryParam)
+              end,
+  ResultHandleFun = fun
+                      (Result) ->
+                        succ = Result
+                    end,
+
+  pg_redoer:add_query(UpIndexKey, ActionFun, ResultHandleFun),
+  ok.
