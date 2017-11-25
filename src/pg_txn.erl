@@ -182,6 +182,7 @@ stage_return_mcht_info({_RepoUp, RepoMcht}, Options) ->
   MRepoMcht = pg_txn:repo_module(mcht_txn_log),
   InfoUrl = pg_model:get(MRepoMcht, RepoMcht, back_url),
 
+  lager:debug("InfoUrl = ~ts,InfoBody = ~ts", [InfoUrl, list_to_binary(InfoBody)]),
   pg_redoer:add_notify(InfoUrl, list_to_binary(InfoBody)),
 
   Result = pg_model:get(MRepoMcht, RepoMcht, txn_status),
