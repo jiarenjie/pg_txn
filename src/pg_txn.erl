@@ -180,8 +180,9 @@ stage_return_mcht_info({_RepoUp, RepoMcht}, Options) ->
 
   pg_redoer:add_notify(InfoUrl, list_to_binary(InfoBody)),
 
+  Result = pg_model:get(MRepoMcht, RepoMcht, txn_status),
 
-  [].
+  [Result].
 
 %%-----------------------------------------------------------------
 %% stage 8
@@ -501,7 +502,8 @@ issue_query_redo(UpIndexKey) when is_tuple(UpIndexKey) ->
               end,
   ResultHandleFun = fun
                       (Result) ->
-                        succ = Result
+                        [success] = Result,
+                        ok
                     end,
 
   pg_redoer:add_query(UpIndexKey, ActionFun, ResultHandleFun),
