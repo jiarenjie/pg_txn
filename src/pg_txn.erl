@@ -91,14 +91,17 @@ stage_send_up_req(PUpReq, Options)
 
   %% receive response
   try
-    {200, Header, Body} = do_post(PostUrl, PostBody),
+%%    {200, Header, Body} = do_post(PostUrl, PostBody),
+    {200, Header, Body} = xfutils:post(PostUrl, PostBody),
+
 
     %% add query request
 %%    UpIndexKey = pg_up_protocol:get(MIn, PUpReq, up_index_key),
-    issue_query_redo(MIn,PUpReq),
+    issue_query_redo(MIn, PUpReq),
     {200, Header, Body}
   catch
-    _:_ ->
+    _:X ->
+      ?LARGER_STACKTRACE_1(X),
       throw({send_up_req_stop, <<"99">>, <<"上游通道接受错误"/utf8>>, {model, MIn, PUpReq}})
   end.
 
@@ -496,6 +499,7 @@ do_update_quota(_, _, _) ->
 %%-----------------------------------------------------------------
 issue_query_redo(M, P) ->
   TxnType = maps:get(txn_type, M:optons()),
+  lager:debug("TxnType = ~p", [TxnType]),
   do_issue_query_redo(TxnType, M, P).
 
 do_issue_query_redo(query, _, _) ->
