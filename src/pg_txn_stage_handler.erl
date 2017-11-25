@@ -8,6 +8,7 @@
 %%%-------------------------------------------------------------------
 -module(pg_txn_stage_handler).
 -include_lib("eunit/include/eunit.hrl").
+-include_lib("xfutils/include/xfutils.hrl").
 -author("simon").
 
 %% API
@@ -18,8 +19,8 @@
   , save_req_model/2
 ]).
 %%-------------------------------------------------------------------
--define(LARGER_STACKTRACE_1(X),
-  lager:error("Error =~p,stacktrace=~s", [X, lager:pr_stacktrace(erlang:get_stacktrace())])).
+%%-define(LARGER_STACKTRACE_1(X),
+%%  lager:error("Error =~p,stacktrace=~s", [X, lager:pr_stacktrace(erlang:get_stacktrace())])).
 
 %%-------------------------------------------------------------------
 validate_format(PV) when is_list(PV) ->

@@ -1,5 +1,6 @@
 -module(pg_txn).
 -include_lib("eunit/include/eunit.hrl").
+-include_lib("xfutils/include/xfutils.hrl").
 
 %% API exports
 -export([
@@ -29,8 +30,8 @@
 ]).
 -define(APP, ?MODULE).
 %%-------------------------------------------------------------------
--define(LARGER_STACKTRACE_1(X),
-  lager:error("Error =~p,stacktrace=~ts", [X, iolist_to_binary(lager:pr_stacktrace(erlang:get_stacktrace()))])).
+%%-define(LARGER_STACKTRACE_1(X),
+%%  lager:error("Error =~p,stacktrace=~ts", [X, iolist_to_binary(lager:pr_stacktrace(erlang:get_stacktrace()))])).
 %%====================================================================
 %% API functions
 %%====================================================================
@@ -498,7 +499,7 @@ do_update_quota(_, _, _) ->
 
 %%-----------------------------------------------------------------
 issue_query_redo(M, P) ->
-  TxnType = maps:get(txn_type, M:optons()),
+  TxnType = maps:get(txn_type, M:options()),
   lager:debug("TxnType = ~p", [TxnType]),
   do_issue_query_redo(TxnType, M, P).
 
