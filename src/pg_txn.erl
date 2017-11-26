@@ -209,23 +209,18 @@ stage_handle_up_resp_query({_Status, _Headers, Body}, Options) when is_binary(Bo
   %% if resp_query's respCode != 00
   %% exit directly
   %% otherwise , update up_txn_log/mcht_txn_log according to origRespCode/origRespMsg
+  %% update @ 2017-11-26
+  %% all resp code is accepted
 
-  RespCode = pg_model:get(MIn, PUpResp, respCode),
-  case RespCode of
-    <<"00">> ->
-      ok;
-    _ ->
-      lager:error("UpQuery return's not success! respCode = ~p,UpRespQuery = ~ts",
-        [RespCode, pg_model:pr(MIn, PUpResp)]),
-      throw({up_resp_return_fail, RespCode, PUpResp})
-  end,
-
-  %% respCode is <<"00">>
-%%  [UpIndexKey, UpRespCd, UpRespMsg, UpQueryId, OrigRespCode, OrigRespMsg] =
-%%    pg_up_protocol:get(MIn, PUpResp, [up_index_key, respCode, respMsg, queryId, origRespCode, origRespMsg]),
-%%
-%%  lager:debug("UpIndexKey = ~p,UpRespCd = ~p,UpRespMsg = ~ts",
-%%    [UpIndexKey, UpRespCd, pg_model:pr(MIn, PUpResp)]),
+%%  RespCode = pg_model:get(MIn, PUpResp, respCode),
+%%  case RespCode of
+%%    <<"00">> ->
+%%      ok;
+%%    _ ->
+%%      lager:error("UpQuery return's not success! respCode = ~p,UpRespQuery = ~ts",
+%%        [RespCode, pg_model:pr(MIn, PUpResp)]),
+%%      throw({up_resp_return_fail, RespCode, PUpResp})
+%%  end,
 
   %% update up_txn_log
   MRepoUp = pg_txn:repo_module(up_txn_log),
