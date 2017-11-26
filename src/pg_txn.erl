@@ -187,7 +187,7 @@ stage_return_mcht_info({_RepoUp, RepoMcht}, Options) ->
 
   Result = pg_model:get(MRepoMcht, RepoMcht, txn_status),
 
-  [Result].
+  [atom_to_binary(Result, utf8)].
 
 %%-----------------------------------------------------------------
 %% stage 8
@@ -519,11 +519,11 @@ do_issue_query_redo(_, M, P) ->
                         %% query result = success/fail, no need query any more
                         %% query result = waiting, continue
                         case Result of
-                          [success] ->
+                          [<<"success">>] ->
                             ok;
-                          [fail] ->
+                          [<<"fail">>] ->
                             ok;
-                          [waiting] ->
+                          [<<"waiting">>] ->
                             continue;
                           _ ->
                             continue

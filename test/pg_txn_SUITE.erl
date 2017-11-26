@@ -540,7 +540,7 @@ mcht_txn_req_collect_test_1() ->
 
   %% stage 7,return_mcht_info
   Return = stage_action(TxnTypeQuery, stage_return_mcht_info, {RepoUpQueryNew, RepoMchtQueryNew}),
-  ?assertEqual([success], Return),
+  ?assertEqual([<<"success">>], Return),
 
   %%-----------------------------------------------------------------------------------
   %% mcht query
