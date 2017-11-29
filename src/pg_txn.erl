@@ -265,10 +265,12 @@ stage_gen_up_reconcile({MMDD,MerId},Options) when
   is_binary(MMDD),is_binary(MerId),is_list(Options) ->
 
   TxnTime = list_to_binary(xfutils:now(txn)),
+  CertId = up_config:get_mer_prop(MerId, certId),
   List = [
     {merId,<<"898319849000018">>}
     ,{settleDate,<<"1127">>}
     ,{txnTime,TxnTime}
+    ,{certId,CertId}
   ]
   ,
   ProtocolRepo = pg_model:new(pg_up_protocol_req_reconcile,List),
