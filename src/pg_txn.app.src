@@ -230,6 +230,38 @@
 
           ]
         }
+        ,{up_reconcile,
+        [
+          {stages,
+            [
+              {stage,
+                {stage_gen_up_reconcile,
+                  [
+                    {model_out, pg_up_protocol_req_reconcile}
+                  ]
+                }
+              },
+              {stage,
+                {stage_send_up_req,
+                  [
+                    {model_in, pg_up_protocol_req_reconcile}
+                    , {post_url, up_file_url}
+                    , {query_action, off}
+                  ]
+                }
+              },
+              {stage,
+                {stage_handle_up_resp_reconcile,
+                  [
+                    {model_in, pg_up_protocol_resp_reconcile}
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+
+      }
       ]
     },
     {modules, []},
