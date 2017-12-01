@@ -295,22 +295,11 @@ stage_handle_up_resp_reconcile({_Status, _Headers, Body}, Options) when is_binar
     <<"00">> ->
       FileName = pg_model:get(MIn,PUpResp,fileName),
       FileContent = pg_model:get(MIn,PUpResp,fileContent),
-      Ret = base64_content_inflate(FileContent),
+      Bin = base64:decode(FileContent),
+      Ret = xfutils:inflate(Bin),
       lager:debug("Ready to write reconcile file = ~p", [FileName]),
       {ok,Ret}
   end.
-base64_content_inflate(Content) when is_binary(Content) ->
-  Z = zlib:open(),
-  zlib:inflateInit(Z),
-  Bin = base64:decode(Content),
-  lager:debug("Content = ~p", [Content]),
-  lager:debug("ContentBin = ~p", [Bin]),
-  PKiolist = zlib:inflate(Z, Bin),
-  lager:debug("Inflate Result = ~p", [PKiolist]),
-  zlib:inflateEnd(Z),
-  %[C] = Ret,
-  %C.
-  PKiolist.
 
 %%-----------------------------------------------------------------
 repo_module(mchants = TableName) ->
