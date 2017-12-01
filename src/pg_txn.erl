@@ -100,7 +100,12 @@ stage_send_up_req(PUpReq, Options)
 
     %% add query request
 %%    UpIndexKey = pg_up_protocol:get(MIn, PUpReq, up_index_key),
-    issue_query_redo(MIn, PUpReq),
+    QueryFlag = proplists:get_value(query_action, Options,on),
+    case QueryFlag of
+        off -> ok;
+        _ -> issue_query_redo(MIn, PUpReq)
+
+    end,
     {200, Header, Body}
   catch
     _:X ->
@@ -260,15 +265,15 @@ stage_handle_mcht_req_query(PV, Options) when is_list(PV), is_list(Options) ->
   {ok, [OrigMchtTxn]} = pg_repo:fetch(MRepoMcht, OrigMchtIndexKey),
 
   {{}, OrigMchtTxn}.
-%% todo 下载银联对账文件
+%%  下载银联对账文件
 stage_gen_up_reconcile({MMDD,MerId},Options) when
   is_binary(MMDD),is_binary(MerId),is_list(Options) ->
 
   TxnTime = list_to_binary(xfutils:now(txn)),
   CertId = up_config:get_mer_prop(MerId, certId),
   List = [
-    {merId,<<"898319849000018">>}
-    ,{settleDate,<<"1127">>}
+    {merId,MerId}
+    ,{settleDate,MMDD}
     ,{txnTime,TxnTime}
     ,{certId,CertId}
   ]
