@@ -321,6 +321,38 @@ env_init() ->
             {resp_protocol_model, pg_mcht_protocol_resp_batch_collect}
           ]
 
+        },
+        {up_reconcile,
+          [
+            {stages,
+              [
+                {stage,
+                  {stage_gen_up_reconcile,
+                    [
+                      {model_out, pg_up_protocol_req_reconcile}
+                    ]
+                  }
+                },
+                {stage,
+                  {stage_send_up_req,
+                    [
+                      {model_in, pg_up_protocol_req_reconcile}
+                      , {post_url, up_file_url}
+                      , {query_action, off}
+                    ]
+                  }
+                },
+                {stage,
+                  {stage_handle_up_resp_reconcile,
+                    [
+                      {model_in, pg_up_protocol_resp_reconcile}
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+
         }
 
       ]
@@ -354,6 +386,8 @@ my_test_() ->
         , {timeout, 240, fun echo_server_test_1/0}
 
         , {timeout, 240, fun info_collect_test_1/0}
+
+        , {timeout, 240, fun up_reconcile_test_1/0}
 
       ]
     }
@@ -716,3 +750,20 @@ info_collect_test_1() ->
   pg_txn:handle(up_txn_info_collect, PV),
 
   ok.
+
+up_reconcile_test_1()->
+  TxnType = up_reconcile,
+  PV = {<<"1127">>,<<"898319849000018">>},
+
+  UpReconcileRepo = stage_action(TxnType, stage_gen_up_reconcile, PV),
+  ?debugFmt("UpReconcileRepo = ~p", [UpReconcileRepo]),
+
+  UpReqQuery = stage_action(TxnType,stage_send_up_req,UpReconcileRepo),
+  ?debugFmt("UpReqQuery = ~p", [UpReqQuery]),
+
+  UpReconcileFile = stage_action(TxnType,stage_handle_up_resp_reconcile,UpReqQuery),
+  ?debugFmt("UpReconcileFile = ~p", [UpReconcileFile]),
+  timer:sleep(1000),
+  UpReconcileFile2 = pg_txn:handle(TxnType,PV),
+  ?debugFmt("UpReconcileFile2 = ~p", [UpReconcileFile2]),
+  ?assertEqual(UpReconcileFile,UpReconcileFile2).

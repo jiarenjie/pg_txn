@@ -27,7 +27,9 @@
   , stage_gen_up_query/2
   , stage_handle_up_resp_query/2
   , stage_handle_mcht_req_query/2
-]).
+  %%对账文件处理
+  , stage_gen_up_reconcile/2
+  , stage_handle_up_resp_reconcile/2]).
 -define(APP, ?MODULE).
 %%-------------------------------------------------------------------
 %%-define(LARGER_STACKTRACE_1(X),
@@ -98,7 +100,12 @@ stage_send_up_req(PUpReq, Options)
 
     %% add query request
 %%    UpIndexKey = pg_up_protocol:get(MIn, PUpReq, up_index_key),
-    issue_query_redo(MIn, PUpReq),
+    QueryFlag = proplists:get_value(query_action, Options,on),
+    case QueryFlag of
+        off -> ok;
+        _ -> issue_query_redo(MIn, PUpReq)
+
+    end,
     {200, Header, Body}
   catch
     _:X ->
@@ -258,7 +265,55 @@ stage_handle_mcht_req_query(PV, Options) when is_list(PV), is_list(Options) ->
   {ok, [OrigMchtTxn]} = pg_repo:fetch(MRepoMcht, OrigMchtIndexKey),
 
   {{}, OrigMchtTxn}.
+%%  下载银联对账文件
+stage_gen_up_reconcile({MMDD,MerId},Options) when
+  is_binary(MMDD),is_binary(MerId),is_list(Options) ->
 
+  TxnTime = list_to_binary(xfutils:now(txn)),
+  CertId = up_config:get_mer_prop(MerId, certId),
+  List = [
+    {merId,MerId}
+    ,{settleDate,MMDD}
+    ,{txnTime,TxnTime}
+    ,{certId,CertId}
+  ]
+  ,
+  ProtocolRepo = pg_model:new(pg_up_protocol_req_reconcile,List),
+  up_sign(pg_up_protocol_req_reconcile,ProtocolRepo).
+
+stage_handle_up_resp_reconcile({_Status, _Headers, Body}, Options) when is_binary(Body)->
+  PV = xfutils:parse_post_body(Body),
+  MIn = proplists:get_value(model_in, Options),
+  PUpResp = pg_protocol:out_2_in(MIn, PV),
+  lager:debug("PUpResp = ~ts", [pg_model:pr(MIn, PUpResp)]),
+  RespCode = pg_model:get(MIn,PUpResp,respCode),
+  case RespCode of
+    <<"98">> ->
+      % file not exist
+      MerId = pg_model:get(MIn,PUpResp,merId),
+      SettleDate = pg_model:get(MIn,PUpResp,settleDate),
+      lager:info("Reconcile file not exist! MerId = ~ts,Date = ~ts", [MerId, SettleDate]),
+      {error,"file is not exist!!"}
+      ;
+    <<"00">> ->
+      FileName = pg_model:get(MIn,PUpResp,fileName),
+      FileContent = pg_model:get(MIn,PUpResp,fileContent),
+      Ret = base64_content_inflate(FileContent),
+      lager:debug("Ready to write reconcile file = ~p", [FileName]),
+      {ok,Ret}
+  end.
+base64_content_inflate(Content) when is_binary(Content) ->
+  Z = zlib:open(),
+  zlib:inflateInit(Z),
+  Bin = base64:decode(Content),
+  lager:debug("Content = ~p", [Content]),
+  lager:debug("ContentBin = ~p", [Bin]),
+  PKiolist = zlib:inflate(Z, Bin),
+  lager:debug("Inflate Result = ~p", [PKiolist]),
+  zlib:inflateEnd(Z),
+  %[C] = Ret,
+  %C.
+  PKiolist.
 
 %%-----------------------------------------------------------------
 repo_module(mchants = TableName) ->
