@@ -690,7 +690,7 @@ batch_collect_test_1() ->
     ],
     pg_model:get(pg_txn:repo_module(mcht_txn_log), RepoMcht,
       [mcht_index_key, txn_type, batch_no, txn_amt, txn_count, file_content])),
-  ?assertEqual(<<"000012017111120171111155907130382068155907130000测试交易http://localhost:8888/pg/simu_mcht_back_succ_info39eJx9kM1KAzEQx++FvkqZ/2STTY7iyUtPPXjVbcQeurukK1iZF5BCT3oqQg++gCeliE/Tj9dwtkrxA00CEzK/mV8Y26MeCQzpEiPS7VRpGNPJUIqrlGJZTI+rYZTmujwaN3JWFINpHdvYr5SYNNU4pv5Yzkc3+0QRUzO6GNSfF21TX1ZlVLiuJs2kSKO66XbIcyvcS43JIbBOPr5AEMdgdmBiIs4pU042r8v1y60oYZXQYwyBgZArAw45TgXekbOOtEK2y+f122zzdL97XP3w+Zz3PvvLp3mwDYaNbB/mm8Xiu8+wVV8AOLOA06Fl3uXInHP/+8yfPn33IYOX3Xy2Xt198QGkGyFQGzO0QzK+bQEof/C9A0jokSU=eeee"/utf8>>,
+  ?assertEqual(<<"9eJx9kM1KAzEQx++FvkqZ/2STTY7iyUtPPXjVbcQeurukK1iZF5BCT3oqQg++gCeliE/Tj9dwtkrxA00CEzK/mV8Y26MeCQzpEiPS7VRpGNPJUIqrlGJZTI+rYZTmujwaN3JWFINpHdvYr5SYNNU4pv5Yzkc3+0QRUzO6GNSfF21TX1ZlVLiuJs2kSKO66XbIcyvcS43JIbBOPr5AEMdgdmBiIs4pU042r8v1y60oYZXQYwyBgZArAw45TgXekbOOtEK2y+f122zzdL97XP3w+Zz3PvvLp3mwDYaNbB/mm8Xiu8+wVV8AOLOA06Fl3uXInHP/+8yfPn33IYOX3Xy2Xt198QGkGyFQGzO0QzK+bQEof/C9A0jokSU=00001测试交易eeee13000032017111120171111155907130382068155907http://localhost:8888/pg/simu_mcht_back_succ_info"/utf8>>,
     pg_mcht_protocol:sign_string(M, PMchtReq)),
 
 
