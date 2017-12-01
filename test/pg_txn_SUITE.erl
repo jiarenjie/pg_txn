@@ -761,9 +761,16 @@ up_reconcile_test_1()->
   UpReqQuery = stage_action(TxnType,stage_send_up_req,UpReconcileRepo),
   ?debugFmt("UpReqQuery = ~p", [UpReqQuery]),
 
-  UpReconcileFile = stage_action(TxnType,stage_handle_up_resp_reconcile,UpReqQuery),
-  ?debugFmt("UpReconcileFile = ~p", [UpReconcileFile]),
-  timer:sleep(1000),
-  UpReconcileFile2 = pg_txn:handle(TxnType,PV),
-  ?debugFmt("UpReconcileFile2 = ~p", [UpReconcileFile2]),
-  ?assertEqual(UpReconcileFile,UpReconcileFile2).
+%%  UpReconcileFile = stage_action(TxnType,stage_handle_up_resp_reconcile,UpReqQuery),
+%%  ?debugFmt("UpReconcileFile = ~p", [UpReconcileFile]),
+  {_Status, _Headers, Body} = UpReqQuery,
+  PostBody = xfutils:parse_post_body(Body),
+  MIn = pg_up_protocol_resp_reconcile,
+  PUpResp = pg_protocol:out_2_in(MIn, PostBody),
+  RespCode = pg_model:get(MIn,PUpResp,respCode),
+  ?assertEqual(<<"00">>,RespCode),
+  FileName = pg_model:get(MIn,PUpResp,fileName),
+  FileContent = pg_model:get(MIn,PUpResp,fileContent),
+  ?assertEqual(<<"898319849000018_20171127.zip">>,FileName),
+  FileContent2 = <<"eJwL8GZmEWFgYOBgWMRV4913hrGiBchLZGJgkGWQYfD08zM0NzQ0MrewiPKNt7C0MDa0tDCxNAACQ4vQEE4G5gZPmSgQLq3gZmBkEeBhYGB5wczAsHeiI9ehAB6X703lJ25d9Zk1f/6at7x7/sf+2a+Rm8stdmS7V4LR4QnuhRsbspouMSTMtPwSabtCcUmYUJvSupKvt6UbLurHiXSoKqzY5N8dsOFc2wkhnorIzG09xR2z7ojP/v5n7+R4IUlm46qdKzfpePnXPNw4qd5E4Rb7hPTYvu16tlWH4nfGzQuAe+0s0GsBWkt1HBiBPE4GBjmg14JcjAwMDSC+MzDE6reLQH9dxPTb2xBf78MOAnv139Sf0J9wVuqtWv2xeHUx26PLdBV517J9yjTszWW61BzQusjkymwVjTRNJ6HJtxao2P7Iy//+ds/MxDKJZ/0Pdhc92Rs7d7b4MffylLsa6asesZ5SmtG9egsfE8eLtSKx+zla1Nt1/C3kVBNOros7NnmzgO19cR/3alFbjjeR30M6UyIfcBya4Z5z9EmmQ/Gy+9wSG3WnHV3r2xd15yLr68itx952MUoe67IKs1JZ2OrsMNuoquB4pqatcO5vW/FGudWv4yKyLs6/k3l7MkdOqW/2bp5qRRbr5+v0Nsd0rb5bL5zjIjDnDacCx7K6Eunv6qxX09vYZRWmPHW37Nv59pfN8ePVV9t/Oui/cPStbUi4UbZ831zTf//5S5Vvep9uNNS5V2R6plFk+q7/H359t/nJ3Bz0X+rOV3f1vHXflqm/5/bNX+Qf4M3IJMeMK9FJMIAAMKIYtjWCWASSICskCaJFEbIVmJGPbMVtIEkoKbBCkgKGHaxsIHOYgPA4kC5mAvEAD9Qc4Q==">>,
+  ?assertEqual(FileContent2,FileContent).
