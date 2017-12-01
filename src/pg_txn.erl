@@ -31,9 +31,6 @@
   , stage_gen_up_reconcile/2
   , stage_handle_up_resp_reconcile/2]).
 -define(APP, ?MODULE).
-%%-------------------------------------------------------------------
-%%-define(LARGER_STACKTRACE_1(X),
-%%  lager:error("Error =~p,stacktrace=~ts", [X, iolist_to_binary(lager:pr_stacktrace(erlang:get_stacktrace()))])).
 %%====================================================================
 %% API functions
 %%====================================================================
