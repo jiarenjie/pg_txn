@@ -297,8 +297,8 @@ stage_handle_up_resp_reconcile({_Status, _Headers, Body}, Options) when is_binar
       FileContent = pg_model:get(MIn,PUpResp,fileContent),
       Bin = base64:decode(FileContent),
       Ret = xfutils:inflate(Bin),
-      lager:debug("Ready to write reconcile file = ~p", [FileName]),
-      {ok,Ret}
+      lager:debug("Ready to write reconcile file = ~ts", [FileName]),
+      {ok,{FileName,Ret}}
   end.
 
 %%-----------------------------------------------------------------
